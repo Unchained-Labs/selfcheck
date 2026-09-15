@@ -72,6 +72,12 @@ picked up with no configuration.
 | GitHub | classic PAT with `repo` (read), or fine-grained with **Pull requests: Read-only** + **Contents: Read-only** |
 | GitLab | `read_api` + `read_repository` |
 
+GitLab's newer fine-grained tokens grant permissions per resource, and one that
+reads merge requests may still be refused on `/projects/:id` or `/user`. That is
+fine: selfcheck treats those as enrichment and falls back to deriving the clone
+URL from the host and path. Adding **Project: Read** just gets you the project's
+canonical clone URL, which matters only if the project has been renamed.
+
 For self-hosted instances, use `SELFCHECK_HOST_TOKENS` — a JSON map of host to
 token:
 

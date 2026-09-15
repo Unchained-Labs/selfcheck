@@ -25,6 +25,18 @@ class GitLabProvider:
     def _project_path(self, ref: PullRef) -> str:
         return quote(f"{ref.namespace}/{ref.project}", safe="")
 
+    async def _optional_json(self, path: str, *, default=None, **kwargs):
+        """GET something we can do without.
+
+        Fine-grained GitLab tokens grant permissions per resource, so a token
+        that reads merge requests fine may still 403 on the project or commit
+        endpoints. Those are enrichment, not essentials.
+        """
+        try:
+            return await self._client.get_json(path, **kwargs)
+        except Exception:
+            return {} if default is None else default
+
     async def fetch_meta(self, ref: PullRef) -> PullMeta:
         proj = self._project_path(ref)
         mr = await self._client.get_json(f"/projects/{proj}/merge_requests/{ref.number}")
@@ -34,34 +46,37 @@ class GitLabProvider:
         if state == "opened":
             state = "open"
 
-        # The target project always exists; the source may be a fork.
-        target_repo = await self._client.get_json(f"/projects/{proj}")
-        head_clone = target_repo.get("http_url_to_repo", "")
+        # `/projects/:id` is a separate permission on a fine-grained token, and
+        # plenty of tokens that can read a merge request cannot read it. The
+        # only thing we want from it is the clone URL, which the host and path
+        # already determine — so never let it fail the whole fetch.
+        fallback_clone = f"https://{self.host}/{ref.full_path}.git"
+        target_repo = await self._optional_json(f"/projects/{proj}")
+        target_clone = target_repo.get("http_url_to_repo") or fallback_clone
+
+        # The source may be a fork. If we cannot see it, the target clone is
+        # still correct: both forges publish the MR head as a ref on the target
+        # repo, which is what workspace.py fetches.
+        head_clone = target_clone
         source_id = mr.get("source_project_id")
         if source_id and source_id != mr.get("target_project_id"):
-            try:
-                src = await self._client.get_json(f"/projects/{source_id}")
-                head_clone = src.get("http_url_to_repo", head_clone)
-            except Exception:
-                pass
+            src = await self._optional_json(f"/projects/{source_id}")
+            head_clone = src.get("http_url_to_repo") or head_clone
 
-        commits: list[dict] = []
-        try:
-            raw = await self._client.get_json(
-                f"/projects/{proj}/merge_requests/{ref.number}/commits",
-                params={"per_page": 100},
-            )
-            for c in raw:
-                commits.append(
-                    {
-                        "sha": c.get("id", ""),
-                        "message": c.get("message", "") or c.get("title", ""),
-                        "author": c.get("author_name", ""),
-                        "date": c.get("created_at", ""),
-                    }
-                )
-        except Exception:
-            pass
+        raw_commits = await self._optional_json(
+            f"/projects/{proj}/merge_requests/{ref.number}/commits",
+            params={"per_page": 100},
+            default=[],
+        )
+        commits = [
+            {
+                "sha": c.get("id", ""),
+                "message": c.get("message", "") or c.get("title", ""),
+                "author": c.get("author_name", ""),
+                "date": c.get("created_at", ""),
+            }
+            for c in raw_commits
+        ]
 
         return PullMeta(
             title=mr.get("title") or "",
@@ -73,7 +88,7 @@ class GitLabProvider:
             head_ref=mr.get("source_branch", ""),
             base_sha=diff_refs.get("base_sha", "") or diff_refs.get("start_sha", ""),
             head_sha=diff_refs.get("head_sha", "") or mr.get("sha", ""),
-            clone_url=target_repo.get("http_url_to_repo", ""),
+            clone_url=target_clone,
             head_clone_url=head_clone,
             changed_files=int((mr.get("changes_count") or "0").rstrip("+") or 0)
             if isinstance(mr.get("changes_count"), str)

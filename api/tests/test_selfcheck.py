@@ -369,3 +369,79 @@ async def claude_runner_terminate(proc):
     from selfcheck.claude_runner import _terminate
 
     await _terminate(proc)
+
+
+# ── fine-grained GitLab tokens ─────────────────────────────────────────────
+
+
+def _gitlab_provider_with(responses):
+    """A GitLabProvider whose HTTP client serves `responses` and 403s the rest."""
+    from selfcheck.providers.gitlab import GitLabProvider
+
+    provider = GitLabProvider("gitlab.com")
+
+    class Denied(Exception):
+        pass
+
+    async def get_json(path, **kwargs):
+        # Exact match: prefix matching would hand the /commits request the
+        # merge-request payload and mask the behaviour under test.
+        if path in responses:
+            return responses[path]
+        raise Denied(f"403 for {path}")
+
+    provider._client.get_json = get_json  # type: ignore[method-assign]
+    return provider
+
+
+def test_gitlab_meta_survives_a_403_on_the_project_endpoint():
+    """A granular PAT can read a merge request but not /projects/:id.
+
+    That endpoint only supplies the clone URL, which the host and path already
+    determine, so it must not fail the whole fetch.
+    """
+    from selfcheck.providers.base import PullRef
+
+    ref = PullRef("gitlab", "gitlab.com", "grp/sub", "proj", 7)
+    provider = _gitlab_provider_with(
+        {
+            "/projects/grp%2Fsub%2Fproj/merge_requests/7": {
+                "title": "A change",
+                "author": {"username": "someone"},
+                "state": "opened",
+                "target_branch": "main",
+                "source_branch": "feature",
+                "diff_refs": {"base_sha": "b" * 40, "head_sha": "h" * 40},
+                "source_project_id": 1,
+                "target_project_id": 1,
+            },
+        }
+    )
+    meta = asyncio.run(provider.fetch_meta(ref))
+
+    assert meta.title == "A change"
+    assert meta.state == "open"
+    assert meta.head_sha == "h" * 40
+    assert meta.clone_url == "https://gitlab.com/grp/sub/proj.git"
+    assert meta.head_clone_url == "https://gitlab.com/grp/sub/proj.git"
+    assert meta.commits == []  # the commits endpoint 403'd too, and that is fine
+
+
+def test_gitlab_prefers_the_real_clone_url_when_it_can_read_it():
+    from selfcheck.providers.base import PullRef
+
+    ref = PullRef("gitlab", "gitlab.com", "grp", "proj", 2)
+    provider = _gitlab_provider_with(
+        {
+            "/projects/grp%2Fproj/merge_requests/2": {
+                "title": "t", "state": "opened",
+                "diff_refs": {"base_sha": "b", "head_sha": "h"},
+                "source_project_id": 1, "target_project_id": 1,
+            },
+            "/projects/grp%2Fproj": {
+                "http_url_to_repo": "https://gitlab.com/grp/renamed.git",
+            },
+        }
+    )
+    meta = asyncio.run(provider.fetch_meta(ref))
+    assert meta.clone_url == "https://gitlab.com/grp/renamed.git"
