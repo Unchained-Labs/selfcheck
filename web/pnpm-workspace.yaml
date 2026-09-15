@@ -1,0 +1,4 @@
+# esbuild ships a prebuilt binary via a postinstall script; Vite cannot run
+# without it. Everything else stays blocked from running install scripts.
+allowBuilds:
+  esbuild: true
