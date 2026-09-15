@@ -88,17 +88,42 @@ SELFCHECK_HOST_TOKENS={"gitlab.corp.io":"glpat-…","ghe.corp.io":"ghp_…"}
 `GET /api/status` reports which hosts have a token and whether the Claude CLI is
 reachable; the sidebar footer shows the same thing.
 
+### Getting the notes out
+
+selfcheck never posts anything, so copying is the handoff. There are four
+places to copy from, and they produce different text on purpose:
+
+| where | gives you |
+| --- | --- |
+| **Copy** on a note in the diff | just the finding — paste straight into an inline review comment |
+| **Copy** on a note in the Notes tab | the same, prefixed with `file:line`, for a comment that is not anchored |
+| **Copy N shown** in the Notes tab | every note matching the current filter, grouped by file |
+| **Copy summary** / **Copy everything** | the verdict and summary, optionally with all findings |
+
+A note with a suggestion on a single line is copied with a ```` ```suggestion ````
+fence, which both GitHub and GitLab turn into an applicable suggestion. The
+clipboard falls back to a hidden-textarea copy when the async API is blocked,
+and the button tells you if even that failed so nothing is silently lost.
+
 ### Keyboard
+
+Press <kbd>?</kbd> in the app for this list.
 
 | key | does |
 | --- | --- |
 | `1` `2` `3` | Summary / Files / Notes |
 | `j` `k` | next / previous file |
+| `n` `p` | next / previous finding — jumps to it in the diff |
 | `u` | split ↔ unified |
 | `w` | ignore whitespace-only changes |
+| `d` | word-level intra-line diff |
 | `f` | only files with open notes |
+| `v` | mark the current file viewed |
+| `c` | copy every open note |
+| `t` | light ↔ dark |
 | `r` | review (or re-review) |
 | `s` | sync with the forge |
+| `?` | shortcuts |
 
 ## Using it from Claude Code
 
@@ -139,6 +164,8 @@ say and easy to get wrong.
    `Copy notes` or `GET /api/reviews/<id>/export.md`.
 
 `scripts/test.sh` runs a suite that asserts each of these.
+`scripts/smoke-ui.sh` drives a real browser against a running instance to
+check what the copy buttons actually put on the clipboard.
 
 ## Architecture
 
@@ -157,7 +184,7 @@ selfcheck/
     tests/
   web/            React 19 + Vite + Shiki. No UI framework, no router.
   skill/selfcheck/  the Claude Code skill
-  scripts/        serve, dev, build, test, install-skill
+  scripts/        serve, dev, build, test, smoke-ui, install-skill
   data/           SQLite db, repo mirrors, worktrees, run logs  (gitignored)
 ```
 

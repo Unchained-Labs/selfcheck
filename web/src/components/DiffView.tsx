@@ -23,6 +23,10 @@ interface Props {
   options: DiffViewOptions
   theme: 'light' | 'dark'
   activeFile: string | null
+  /** Path whose rows must be shown even if the file is marked viewed. Set when
+   *  jumping to a finding, so the target is never hidden behind a collapsed
+   *  header or filtered out of the list. */
+  forceOpenFile?: string | null
   onToggleViewed: (path: string, viewed: boolean) => void
   onNotesChanged: () => void
 }
@@ -392,12 +396,13 @@ interface FileProps {
   viewed: boolean
   options: DiffViewOptions
   theme: 'light' | 'dark'
+  forceOpen: boolean
   onToggleViewed: (path: string, viewed: boolean) => void
   onNotesChanged: () => void
 }
 
 const DiffFileView = memo(function DiffFileView({
-  reviewId, file, notes, viewed, options, theme, onToggleViewed, onNotesChanged,
+  reviewId, file, notes, viewed, options, theme, forceOpen, onToggleViewed, onNotesChanged,
 }: FileProps) {
   const [wrapRef, inView] = useInView<HTMLDivElement>()
   const [collapsed, setCollapsed] = useState(viewed)
@@ -408,6 +413,7 @@ const DiffFileView = memo(function DiffFileView({
   const [composeAt, setComposeAt] = useState<{ line: number; side: 'new' | 'old' } | null>(null)
 
   useEffect(() => { setCollapsed(viewed) }, [viewed])
+  useEffect(() => { if (forceOpen) setCollapsed(false) }, [forceOpen])
 
   const open = inView && !collapsed && !file.is_binary
   const colSpan = options.split ? 6 : 4
@@ -660,7 +666,7 @@ const DiffFileView = memo(function DiffFileView({
 /* ── top level ─────────────────────────────────────────────────────────── */
 
 export function DiffView({
-  reviewId, files, notes, viewed, options, theme, activeFile,
+  reviewId, files, notes, viewed, options, theme, activeFile, forceOpenFile,
   onToggleViewed, onNotesChanged,
 }: Props) {
   const byFile = useMemo(() => {
@@ -676,9 +682,11 @@ export function DiffView({
 
   const shown = useMemo(
     () => (options.onlyWithNotes
-      ? files.filter((f) => (byFile.get(f.path) ?? []).some((n) => n.status === 'open'))
+      ? files.filter((f) =>
+          f.path === forceOpenFile ||
+          (byFile.get(f.path) ?? []).some((n) => n.status === 'open'))
       : files),
-    [files, options.onlyWithNotes, byFile],
+    [files, options.onlyWithNotes, byFile, forceOpenFile],
   )
 
   useEffect(() => {
@@ -710,6 +718,7 @@ export function DiffView({
           viewed={!!viewed[f.path]}
           options={options}
           theme={theme}
+          forceOpen={forceOpenFile === f.path}
           onToggleViewed={onToggleViewed}
           onNotesChanged={onNotesChanged}
         />

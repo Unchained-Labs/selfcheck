@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './lib/api'
-import type {
-  DiffPayload, Note, Review, ReviewDetail, Status,
-} from './lib/types'
+import { copyText } from './lib/clipboard'
+import { notesToMarkdown } from './lib/noteText'
+import { timeAgo } from './lib/time'
+import type { DiffPayload, Note, Review, ReviewDetail, Severity, Status } from './lib/types'
+import { CopyButton } from './components/CopyButton'
 import { DiffView, type DiffViewOptions } from './components/DiffView'
 import { FilePane } from './components/FilePane'
-import { NoteCard } from './components/NoteCard'
 import { NoteComposer } from './components/NoteComposer'
+import { NotesPane } from './components/NotesPane'
 import { RunBar } from './components/RunBar'
+import { ShortcutsOverlay } from './components/ShortcutsOverlay'
 import { Sidebar } from './components/Sidebar'
 import { SummaryPane } from './components/SummaryPane'
 
 type Tab = 'summary' | 'diff' | 'notes'
+
+const SEVERITY_ORDER: Severity[] = ['blocker', 'major', 'minor', 'question', 'nit', 'praise']
 
 const DEFAULT_OPTIONS: DiffViewOptions = {
   split: true,
@@ -55,11 +60,15 @@ export function App() {
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState<{ text: string; err?: boolean } | null>(null)
   const [generalComposer, setGeneralComposer] = useState(false)
-  const diffScroller = useRef<HTMLDivElement>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingJump, setPendingJump] = useState<Note | null>(null)
+  const [forceOpenFile, setForceOpenFile] = useState<string | null>(null)
+  const findingIndex = useRef(-1)
 
   const flash = useCallback((text: string, err = false) => {
     setToast({ text, err })
-    setTimeout(() => setToast(null), err ? 6000 : 2600)
+    setTimeout(() => setToast(null), err ? 6000 : 2400)
   }, [])
 
   /* ── routing ─────────────────────────────────────────────────────────── */
@@ -89,6 +98,7 @@ export function App() {
     window.location.hash = `#/r/${encodeURIComponent(id)}`
     setActiveId(id)
     setTabState('summary')
+    setSidebarOpen(false)
   }, [])
 
   /* ── data ────────────────────────────────────────────────────────────── */
@@ -125,6 +135,7 @@ export function App() {
     setDetail(null)
     setDiff(null)
     setActiveFile(null)
+    findingIndex.current = -1
     void loadDetail(activeId)
     void api.diff(activeId).then(setDiff).catch((e) => {
       flash(`Could not load diff: ${e instanceof Error ? e.message : e}`, true)
@@ -156,11 +167,82 @@ export function App() {
     })
   }, [])
 
-  /* ── actions ─────────────────────────────────────────────────────────── */
+  /* ── derived ─────────────────────────────────────────────────────────── */
   const review = detail?.review ?? null
   const latestRun = detail?.latest_run ?? null
-  const running = latestRun && ['queued', 'preparing', 'analyzing'].includes(latestRun.status)
+  const running = !!latestRun && ['queued', 'preparing', 'analyzing'].includes(latestRun.status)
+  const notes: Note[] = useMemo(() => detail?.notes ?? [], [detail])
+  const openNotes = useMemo(() => notes.filter((n) => n.status === 'open'), [notes])
 
+  const viewedMap = useMemo(() => {
+    const out: Record<string, boolean> = {}
+    for (const [path, st] of Object.entries(detail?.file_states ?? {})) out[path] = !!st.viewed
+    return out
+  }, [detail])
+
+  /** Findings in the order you would walk them: file order from the diff,
+   *  then line order inside each file. */
+  const findings = useMemo(() => {
+    const order = new Map((diff?.files ?? []).map((f, i) => [f.path, i]))
+    return openNotes
+      .filter((n) => n.file_path)
+      .slice()
+      .sort((a, b) =>
+        (order.get(a.file_path) ?? 1e9) - (order.get(b.file_path) ?? 1e9) ||
+        (a.line_start ?? 0) - (b.line_start ?? 0))
+  }, [openNotes, diff])
+
+  const severityCounts = useMemo(() => {
+    const out = {} as Record<Severity, number>
+    for (const s of SEVERITY_ORDER) out[s] = 0
+    for (const n of openNotes) out[n.severity] = (out[n.severity] ?? 0) + 1
+    return out
+  }, [openNotes])
+
+  /* ── jumping to a finding ────────────────────────────────────────────── */
+  const jumpToNote = useCallback((note: Note) => {
+    setTab('diff')
+    if (note.file_path) {
+      setForceOpenFile(note.file_path)
+      setActiveFile(note.file_path)
+    }
+    setPendingJump(note)
+  }, [setTab])
+
+  // The target file may not be rendered yet (rows mount lazily), so poll
+  // briefly for the note's element rather than assuming it is already there.
+  useEffect(() => {
+    if (!pendingJump) return
+    let cancelled = false
+    let tries = 0
+    const tick = () => {
+      if (cancelled) return
+      const el = document.getElementById(`note-${pendingJump.id}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('flash')
+        window.setTimeout(() => el.classList.remove('flash'), 1400)
+        setPendingJump(null)
+        return
+      }
+      if (tries++ < 40) window.setTimeout(tick, 60)
+      else setPendingJump(null)
+    }
+    tick()
+    return () => { cancelled = true }
+  }, [pendingJump])
+
+  const stepFinding = useCallback((delta: number) => {
+    if (!findings.length) {
+      flash('No open findings')
+      return
+    }
+    const next = (findingIndex.current + delta + findings.length * 2) % findings.length
+    findingIndex.current = next
+    jumpToNote(findings[next])
+  }, [findings, jumpToNote, flash])
+
+  /* ── actions ─────────────────────────────────────────────────────────── */
   const doSync = useCallback(async () => {
     if (!activeId) return
     setBusy('sync')
@@ -189,7 +271,7 @@ export function App() {
     } finally {
       setBusy('')
     }
-  }, [activeId, loadDetail, flash])
+  }, [activeId, loadDetail, flash, setTab])
 
   const toggleWatch = useCallback(async () => {
     if (!review) return
@@ -197,16 +279,16 @@ export function App() {
     refreshDetail()
   }, [review, refreshDetail])
 
-  const doExport = useCallback(async () => {
-    if (!activeId) return
-    try {
-      const md = await api.exportMarkdown(activeId)
-      await navigator.clipboard.writeText(md)
-      flash('Review notes copied to the clipboard')
-    } catch {
-      window.open(api.exportUrl(activeId), '_blank')
+  const copyAll = useCallback(async () => {
+    if (!openNotes.length) {
+      flash('No open notes to copy')
+      return
     }
-  }, [activeId, flash])
+    const ok = await copyText(notesToMarkdown(openNotes))
+    flash(ok === 'ok'
+      ? `Copied ${openNotes.length} note${openNotes.length === 1 ? '' : 's'}`
+      : 'The browser blocked the clipboard — use the Notes tab and copy manually', ok !== 'ok')
+  }, [openNotes, flash])
 
   const doDelete = useCallback(async () => {
     if (!review) return
@@ -228,59 +310,45 @@ export function App() {
           },
         }
       : d))
+    if (isViewed && forceOpenFile === path) setForceOpenFile(null)
     try {
-      await fetch(`/api/reviews/${activeId}/files/viewed`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path, viewed: isViewed }),
-      })
+      await api.setFileViewed(activeId, path, isViewed)
     } catch {
       flash('Could not save the viewed state', true)
     }
-  }, [activeId, flash])
-
-  /* ── derived ─────────────────────────────────────────────────────────── */
-  const notes: Note[] = detail?.notes ?? []
-  const openNotes = useMemo(() => notes.filter((n) => n.status === 'open'), [notes])
-  const viewedMap = useMemo(() => {
-    const out: Record<string, boolean> = {}
-    for (const [path, st] of Object.entries(detail?.file_states ?? {})) out[path] = !!st.viewed
-    return out
-  }, [detail])
-
-  const anchoredNotes = useMemo(
-    () => [...openNotes].sort((a, b) => {
-      const rank = { blocker: 0, major: 1, minor: 2, question: 3, nit: 4, praise: 5 } as const
-      return rank[a.severity] - rank[b.severity] || a.file_path.localeCompare(b.file_path)
-    }),
-    [openNotes],
-  )
+  }, [activeId, flash, forceOpenFile])
 
   /* ── keyboard ────────────────────────────────────────────────────────── */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null
-      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
+      if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
+      if (e.key === 'Escape') {
+        setShowShortcuts(false)
+        setSidebarOpen(false)
+        return
+      }
+      if (e.key === '?') { setShowShortcuts((s) => !s); e.preventDefault(); return }
+      if (!review) return
+
       switch (e.key) {
-        case 'u':
-          setOption({ split: !options.split })
-          break
-        case 'w':
-          setOption({ ignoreWhitespace: !options.ignoreWhitespace })
-          break
-        case 'f':
-          setOption({ onlyWithNotes: !options.onlyWithNotes })
-          break
         case '1': setTab('summary'); break
         case '2': setTab('diff'); break
         case '3': setTab('notes'); break
-        case 'r':
-          if (!running) void doReview()
-          break
-        case 's':
-          void doSync()
+        case 'u': setOption({ split: !options.split }); break
+        case 'w': setOption({ ignoreWhitespace: !options.ignoreWhitespace }); break
+        case 'd': setOption({ wordDiff: !options.wordDiff }); break
+        case 'f': setOption({ onlyWithNotes: !options.onlyWithNotes }); break
+        case 't': toggleTheme(); break
+        case 'c': void copyAll(); break
+        case 'n': stepFinding(1); break
+        case 'p': stepFinding(-1); break
+        case 'r': if (!running) void doReview(); break
+        case 's': void doSync(); break
+        case 'v':
+          if (activeFile) void toggleViewed(activeFile, !viewedMap[activeFile])
           break
         case 'j':
         case 'k': {
@@ -300,11 +368,14 @@ export function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [options, diff, activeFile, running, doReview, doSync, setOption])
+  }, [
+    options, diff, activeFile, running, review, viewedMap,
+    doReview, doSync, setOption, setTab, toggleTheme, copyAll, stepFinding, toggleViewed,
+  ])
 
   /* ── render ──────────────────────────────────────────────────────────── */
   return (
-    <div className="app">
+    <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
       <Sidebar
         reviews={reviews}
         activeId={activeId}
@@ -313,6 +384,11 @@ export function App() {
         onSelect={select}
         onChanged={refreshList}
         onToggleTheme={toggleTheme}
+      />
+      <div
+        className="sidebar-scrim"
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
       />
 
       <main className="main">
@@ -324,13 +400,10 @@ export function App() {
               <br />
               Claude reads the change against a read-only checkout and writes review notes here.
             </p>
-            <p className="faint">
-              Nothing is ever posted back to the forge — selfcheck only reads.
-            </p>
-            <p className="faint" style={{ fontSize: 11 }}>
-              <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> tabs · <kbd>j</kbd>/<kbd>k</kbd> files ·{' '}
-              <kbd>u</kbd> unified · <kbd>w</kbd> whitespace · <kbd>r</kbd> review · <kbd>s</kbd> sync
-            </p>
+            <p className="faint">Nothing is ever posted back to the forge — selfcheck only reads.</p>
+            <button className="btn" onClick={() => setShowShortcuts(true)}>
+              Keyboard shortcuts <kbd>?</kbd>
+            </button>
           </div>
         )}
 
@@ -338,12 +411,23 @@ export function App() {
           <>
             <header className="rev-head">
               <div className="row">
-                <span className="rev-title truncate" title={review.title}>{review.title || review.url}</span>
+                <button
+                  className="btn ghost sm sidebar-toggle"
+                  onClick={() => setSidebarOpen((s) => !s)}
+                  aria-label="Show tracked reviews"
+                  title="Tracked reviews"
+                >
+                  ☰
+                </button>
+                <span className="rev-title truncate" title={review.title}>
+                  {review.title || review.url}
+                </span>
                 <span className="spacer" />
                 <a className="btn sm" href={review.url} target="_blank" rel="noreferrer">
                   Open on {review.provider === 'github' ? 'GitHub' : 'GitLab'} ↗
                 </a>
               </div>
+
               <div className="rev-meta">
                 <span className={`chip ${review.state === 'open' ? 'open' : review.state === 'merged' ? 'merged' : 'closed'}`}>
                   {review.draft ? 'draft' : review.state}
@@ -361,11 +445,38 @@ export function App() {
                   <span className="d">−{review.deletions}</span>{' '}
                   <span className="faint">in {review.changed_files} files</span>
                 </span>
+                {review.last_synced_at && (
+                  <span className="faint" title={review.last_synced_at}>
+                    synced {timeAgo(review.last_synced_at)}
+                  </span>
+                )}
+              </div>
+
+              <div className="rev-actions">
+                {openNotes.length > 0 && (
+                  <div className="row sev-summary" title="Open findings by severity">
+                    {SEVERITY_ORDER.filter((s) => severityCounts[s] > 0).map((s) => (
+                      <button
+                        key={s}
+                        className={`sev-chip sev-${s}`}
+                        onClick={() => setTab('notes')}
+                        title={`${severityCounts[s]} ${s} — open the Notes tab`}
+                      >
+                        <span className="dot" />{severityCounts[s]} {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <span className="spacer" />
-                <button className="btn sm" disabled={!!busy} onClick={doSync}>
+                <button className="btn sm" disabled={!!busy} onClick={doSync} title="Refetch from the forge (s)">
                   {busy === 'sync' ? 'Syncing…' : 'Sync'}
                 </button>
-                <button className="btn sm primary" disabled={!!busy || !!running} onClick={doReview}>
+                <button
+                  className="btn sm primary"
+                  disabled={!!busy || running}
+                  onClick={doReview}
+                  title="Have Claude read the change (r)"
+                >
                   {running ? 'Reviewing…' : latestRun ? 'Re-review' : 'Review with Claude'}
                 </button>
                 <button
@@ -377,20 +488,34 @@ export function App() {
                 >
                   {review.watch ? '👁 Watching' : 'Watch'}
                 </button>
-                <button className="btn sm" onClick={doExport} title="Copy review notes as markdown">
-                  Copy notes
+                <CopyButton
+                  className="btn sm"
+                  label={`Copy ${openNotes.length} note${openNotes.length === 1 ? '' : 's'}`}
+                  title="Copy every open note as markdown, grouped by file (c)"
+                  text={() => notesToMarkdown(openNotes)}
+                />
+                <button
+                  className="btn sm ghost"
+                  onClick={() => setShowShortcuts(true)}
+                  title="Keyboard shortcuts (?)"
+                  aria-label="Keyboard shortcuts"
+                >
+                  ?
                 </button>
-                <button className="btn sm ghost danger" onClick={doDelete} title="Stop tracking">
+                <button
+                  className="btn sm ghost danger"
+                  onClick={doDelete}
+                  title="Stop tracking this review"
+                  aria-label="Stop tracking this review"
+                >
                   ✕
                 </button>
               </div>
             </header>
 
-            {running && latestRun && (
-              <RunBar run={latestRun} onFinished={refreshDetail} />
-            )}
+            {running && latestRun && <RunBar run={latestRun} onFinished={refreshDetail} />}
 
-            {!status?.claude.available && status && (
+            {status && !status.claude.available && (
               <div className="banner err">
                 Claude Code CLI not available: {status.claude.error ?? 'unknown error'}
               </div>
@@ -401,16 +526,38 @@ export function App() {
                 Summary
               </button>
               <button className={`tab ${tab === 'diff' ? 'active' : ''}`} onClick={() => setTab('diff')}>
-                Files
-                <span className="n">{diff?.files.length ?? review.changed_files}</span>
+                Files<span className="n">{diff?.files.length ?? review.changed_files}</span>
               </button>
               <button className={`tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => setTab('notes')}>
-                Notes
-                <span className="n">{openNotes.length}</span>
+                Notes<span className="n">{openNotes.length}</span>
               </button>
               <span className="spacer" />
               {tab === 'diff' && (
-                <div className="row" style={{ padding: '4px 0' }}>
+                <div className="row diff-opts">
+                  {findings.length > 0 && (
+                    <>
+                      <span className="faint" style={{ fontSize: 11 }}>
+                        {findings.length} finding{findings.length === 1 ? '' : 's'}
+                      </span>
+                      <button
+                        className="btn ghost sm"
+                        onClick={() => stepFinding(-1)}
+                        title="Previous finding (p)"
+                        aria-label="Previous finding"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        className="btn ghost sm"
+                        onClick={() => stepFinding(1)}
+                        title="Next finding (n)"
+                        aria-label="Next finding"
+                      >
+                        ↓
+                      </button>
+                      <span className="divider" />
+                    </>
+                  )}
                   <button
                     className={`btn ghost sm ${options.split ? 'on' : ''}`}
                     onClick={() => setOption({ split: !options.split })}
@@ -421,7 +568,7 @@ export function App() {
                   <button
                     className={`btn ghost sm ${options.wordDiff ? 'on' : ''}`}
                     onClick={() => setOption({ wordDiff: !options.wordDiff })}
-                    title="Highlight what changed within a line"
+                    title="Highlight what changed within a line (d)"
                   >
                     Word diff
                   </button>
@@ -445,7 +592,14 @@ export function App() {
 
             {tab === 'summary' && (
               <div className="scroller">
-                <SummaryPane run={latestRun} notes={notes.filter((n) => n.status === 'open')} onNotesChanged={refreshDetail} />
+                <SummaryPane
+                  run={latestRun}
+                  runs={detail?.runs ?? []}
+                  review={review}
+                  notes={openNotes}
+                  onNotesChanged={refreshDetail}
+                  onReview={running ? undefined : doReview}
+                />
               </div>
             )}
 
@@ -459,7 +613,7 @@ export function App() {
                   onPick={setActiveFile}
                   onToggleViewed={toggleViewed}
                 />
-                <div className="scroller" ref={diffScroller}>
+                <div className="scroller">
                   {diff ? (
                     <DiffView
                       reviewId={review.id}
@@ -469,6 +623,7 @@ export function App() {
                       options={options}
                       theme={theme}
                       activeFile={activeFile}
+                      forceOpenFile={forceOpenFile}
                       onToggleViewed={toggleViewed}
                       onNotesChanged={refreshDetail}
                     />
@@ -481,31 +636,12 @@ export function App() {
 
             {tab === 'notes' && (
               <div className="scroller">
-                <div className="pane">
-                  <div className="row" style={{ marginBottom: 12 }}>
-                    <h3 style={{ margin: 0 }}>{openNotes.length} open notes</h3>
-                    <span className="spacer" />
-                    <button className="btn sm" onClick={() => setGeneralComposer(true)}>
-                      Add a note
-                    </button>
-                  </div>
-                  {anchoredNotes.map((n) => (
-                    <NoteCard key={n.id} note={n} onChanged={refreshDetail} showLocation />
-                  ))}
-                  {!anchoredNotes.length && (
-                    <p className="muted">
-                      No open notes. Resolved and dismissed ones stay in the export if you ask for them.
-                    </p>
-                  )}
-                  {notes.some((n) => n.status !== 'open') && (
-                    <>
-                      <h3 style={{ marginTop: 24 }}>Closed</h3>
-                      {notes.filter((n) => n.status !== 'open').map((n) => (
-                        <NoteCard key={n.id} note={n} onChanged={refreshDetail} showLocation />
-                      ))}
-                    </>
-                  )}
-                </div>
+                <NotesPane
+                  notes={notes}
+                  onChanged={refreshDetail}
+                  onJump={jumpToNote}
+                  onAdd={() => setGeneralComposer(true)}
+                />
               </div>
             )}
 
@@ -523,6 +659,7 @@ export function App() {
         )}
       </main>
 
+      {showShortcuts && <ShortcutsOverlay onClose={() => setShowShortcuts(false)} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.text}</div>}
     </div>
   )

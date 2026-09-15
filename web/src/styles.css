@@ -194,8 +194,6 @@ a:hover { text-decoration: underline; }
 }
 .fitem:hover { background: var(--bg-hover); }
 .fitem.active { background: var(--accent-dim); border-left-color: var(--accent); }
-.fitem.viewed .fname { opacity: .45; text-decoration: line-through; }
-.fname { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .fstat { font-size: 10.5px; font-family: var(--mono); white-space: nowrap; }
 .fstat .a { color: var(--sev-praise); }
 .fstat .d { color: var(--sev-blocker); }
@@ -300,7 +298,6 @@ tr.hl .code { box-shadow: inset 3px 0 0 var(--accent); }
 /* ── misc ───────────────────────────────────────────────────────────────── */
 .blank { display: grid; place-content: center; gap: 12px; height: 100%; text-align: center; color: var(--fg-muted); padding: 40px; }
 .blank h2 { margin: 0; font-size: 18px; color: var(--fg); font-weight: 600; }
-.blank kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; background: var(--bg-raised); }
 
 .banner { padding: 8px 16px; font-size: 12px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
 .banner.warn { background: color-mix(in srgb, var(--sev-major) 12%, var(--bg)); color: var(--sev-major); }
@@ -333,3 +330,139 @@ td.code.empty-half, td.mark.empty-half { background: var(--bg-inset); }
 .prose pre { background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: 11.5px; }
 
 .filepane input[type='checkbox'], .dhead input[type='checkbox'] { accent-color: var(--accent); margin: 0; }
+
+/* ── copy affordances ───────────────────────────────────────────────────── */
+.copy-btn { gap: 5px; }
+.copy-btn.ok { color: var(--sev-praise); border-color: var(--sev-praise); }
+.copy-btn.failed { color: var(--sev-major); border-color: var(--sev-major); }
+.copy-btn span[aria-hidden] { font-size: 11px; opacity: .8; }
+
+/* ── review header actions ──────────────────────────────────────────────── */
+.rev-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sev-summary { gap: 5px; flex-wrap: wrap; }
+
+.sev-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px; font-size: 11px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border-strong); color: var(--fg-muted);
+  transition: background .12s, border-color .12s;
+}
+.sev-chip .dot { color: inherit; }
+.sev-chip b { font-weight: 600; color: var(--fg); }
+.sev-chip:hover { background: var(--bg-hover); }
+.sev-chip.on { border-color: currentColor; background: color-mix(in srgb, currentColor 14%, transparent); }
+.sev-chip.sev-blocker { color: var(--sev-blocker); }
+.sev-chip.sev-major { color: var(--sev-major); }
+.sev-chip.sev-minor { color: var(--sev-minor); }
+.sev-chip.sev-nit { color: var(--sev-nit); }
+.sev-chip.sev-question { color: var(--sev-question); }
+.sev-chip.sev-praise { color: var(--sev-praise); }
+
+.diff-opts { padding: 4px 0; gap: 4px; flex-wrap: wrap; }
+.diff-opts .divider { width: 1px; height: 16px; background: var(--border-strong); margin: 0 3px; }
+
+/* ── segmented control ──────────────────────────────────────────────────── */
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+.seg button {
+  border: 0; background: transparent; color: var(--fg-muted);
+  padding: 5px 12px; cursor: pointer; font-size: 12px;
+}
+.seg button + button { border-left: 1px solid var(--border-strong); }
+.seg button:hover { background: var(--bg-hover); color: var(--fg); }
+.seg button.on { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
+
+/* ── notes pane ─────────────────────────────────────────────────────────── */
+.notes-pane { max-width: 1000px; }
+.notes-toolbar {
+  position: sticky; top: 0; z-index: 4; display: grid; gap: 8px;
+  padding: 12px 0 10px; margin-bottom: 4px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.sev-filters { gap: 5px; }
+
+.note.flash { animation: flash 1.4s ease-out; }
+@keyframes flash {
+  0%, 30% { box-shadow: 0 0 0 3px var(--accent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.sev-select {
+  background: transparent; border: 1px solid var(--border); border-radius: 4px;
+  padding: 1px 4px; cursor: pointer; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.sev-select.sev-blocker { color: var(--sev-blocker); }
+.sev-select.sev-major { color: var(--sev-major); }
+.sev-select.sev-minor { color: var(--sev-minor); }
+.sev-select.sev-nit { color: var(--sev-nit); }
+.sev-select.sev-question { color: var(--sev-question); }
+.sev-select.sev-praise { color: var(--sev-praise); }
+
+.loc-link { cursor: pointer; background: transparent; color: var(--accent); border-color: var(--border-strong); }
+.loc-link:hover { background: var(--accent-dim); border-color: var(--accent); }
+
+/* ── file pane path rendering ───────────────────────────────────────────── */
+.fname { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11.5px; display: flex; overflow: hidden; direction: ltr; text-align: left; }
+.fdir { color: var(--fg-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; min-width: 0; }
+.fbase { color: inherit; white-space: nowrap; flex-shrink: 0; }
+.fitem.viewed .fname { opacity: .45; }
+.fitem.viewed .fbase { text-decoration: line-through; }
+.fcount {
+  font-size: 10px; min-width: 16px; text-align: center; border-radius: 999px;
+  background: var(--bg-inset); border: 1px solid var(--border-strong);
+  color: var(--fg-muted); padding: 0 4px;
+}
+
+/* ── run history ────────────────────────────────────────────────────────── */
+.history { display: grid; gap: 2px; }
+.history-row {
+  display: flex; align-items: center; gap: 10px; font-size: 12px;
+  padding: 5px 6px; border-radius: 4px;
+}
+.history-row:hover { background: var(--bg-hover); }
+.verdict-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); flex: none; }
+.verdict-dot.looks_good { background: var(--sev-praise); }
+.verdict-dot.comments { background: var(--sev-minor); }
+.verdict-dot.needs_work { background: var(--sev-blocker); }
+.verdict-dot.failed { background: var(--sev-blocker); }
+.verdict-dot.cancelled { background: var(--fg-faint); }
+
+/* ── shortcuts overlay ──────────────────────────────────────────────────── */
+.modal.shortcuts .content { gap: 18px; }
+.modal.shortcuts h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-muted); }
+.modal.shortcuts dl { margin: 0; display: grid; gap: 6px; }
+.shortcut-row { display: grid; grid-template-columns: 96px 1fr; align-items: baseline; gap: 10px; }
+.shortcut-row dt { display: flex; gap: 4px; }
+.shortcut-row dd { margin: 0; color: var(--fg-muted); font-size: 12.5px; }
+kbd {
+  font-family: var(--mono); font-size: 11px; line-height: 1.6;
+  border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px;
+  padding: 0 5px; background: var(--bg-raised); color: var(--fg);
+}
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+.sidebar-toggle { display: none; }
+.sidebar-scrim { display: none; }
+
+@media (max-width: 1080px) {
+  .body { grid-template-columns: 220px 1fr; }
+  .rev-actions .sev-summary { order: 10; width: 100%; }
+}
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; width: min(320px, 86vw); z-index: 40;
+    transform: translateX(-100%); transition: transform .18s ease;
+    box-shadow: var(--shadow);
+  }
+  .app.sidebar-open .sidebar { transform: none; }
+  .app.sidebar-open .sidebar-scrim {
+    display: block; position: fixed; inset: 0; z-index: 35; background: rgb(0 0 0 / .45);
+  }
+  .sidebar-toggle { display: inline-flex; }
+  .body { grid-template-columns: 1fr; }
+  .filepane { display: none; }
+  .diff-file { margin-left: 6px; margin-right: 6px; }
+  .rev-title { font-size: 15px; }
+}

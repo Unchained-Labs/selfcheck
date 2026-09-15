@@ -54,6 +54,12 @@ export const api = {
   blob: (id: string, path: string, side: 'new' | 'old') =>
     req<string>(`/api/reviews/${id}/blob?path=${encodeURIComponent(path)}&side=${side}`),
 
+  setFileViewed: (id: string, path: string, viewed: boolean) =>
+    req<{ file_path: string; viewed: boolean }>(
+      `/api/reviews/${id}/files/viewed`,
+      body({ path, viewed }),
+    ),
+
   startRun: (id: string, guidance = '') =>
     req<{ run: Run }>(`/api/reviews/${id}/runs`, body({ guidance, trigger: 'manual' })),
 

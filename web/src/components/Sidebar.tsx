@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api, ApiError } from '../lib/api'
+import { timeAgo } from '../lib/time'
 import type { Review, Status } from '../lib/types'
 
 function stateChip(r: Review) {
@@ -40,6 +41,14 @@ export function Sidebar({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [reviewNow, setReviewNow] = useState(true)
+  const [filter, setFilter] = useState('')
+
+  const shown = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return reviews
+    return reviews.filter((r) =>
+      `${r.title} ${r.namespace}/${r.project} #${r.number} ${r.author}`.toLowerCase().includes(q))
+  }, [reviews, filter])
 
   const add = async () => {
     const value = url.trim()
@@ -65,7 +74,12 @@ export function Sidebar({
           selfcheck
           <span className="ro" title="selfcheck never writes to GitHub or GitLab">read only</span>
           <span className="spacer" />
-          <button className="btn ghost sm" onClick={onToggleTheme} title="Toggle theme">
+          <button
+            className="btn ghost sm"
+            onClick={onToggleTheme}
+            title="Toggle light / dark (t)"
+            aria-label="Toggle light or dark theme"
+          >
             {theme === 'dark' ? '☀' : '☾'}
           </button>
         </div>
@@ -94,13 +108,30 @@ export function Sidebar({
         {error && <div className="banner err" style={{ borderRadius: 4, padding: '6px 8px' }}>{error}</div>}
       </div>
 
+      {reviews.length > 5 && (
+        <div style={{ padding: '6px 12px 0' }}>
+          <input
+            className="input"
+            placeholder="Filter tracked reviews…"
+            value={filter}
+            aria-label="Filter tracked reviews"
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        </div>
+      )}
+
       <div className="sidebar-list">
         {!reviews.length && (
           <p className="faint" style={{ padding: 12, textAlign: 'center', fontSize: 12 }}>
             Nothing tracked yet. Paste a pull request or merge request link above.
           </p>
         )}
-        {reviews.map((r) => (
+        {reviews.length > 0 && !shown.length && (
+          <p className="faint" style={{ padding: 12, textAlign: 'center', fontSize: 12 }}>
+            No tracked review matches “{filter}”.
+          </p>
+        )}
+        {shown.map((r) => (
           <button
             key={r.id}
             className={`rev-item ${r.id === activeId ? 'active' : ''}`}
@@ -117,7 +148,13 @@ export function Sidebar({
             <span className="s">
               {severityDots(r) ?? <span className="faint">no notes yet</span>}
               <span className="spacer" />
-              {r.latest_run?.status === 'analyzing' && <span className="spin">◴</span>}
+              {r.latest_run && ['queued', 'preparing', 'analyzing'].includes(r.latest_run.status) ? (
+                <span className="spin" title="Reviewing now">◴</span>
+              ) : (
+                <span className="faint" title={`Last synced ${r.last_synced_at || 'never'}`}>
+                  {timeAgo(r.last_synced_at)}
+                </span>
+              )}
             </span>
           </button>
         ))}

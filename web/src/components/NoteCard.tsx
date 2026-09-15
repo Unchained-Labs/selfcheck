@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
+import { noteLocation, noteToMarkdown } from '../lib/noteText'
 import type { Note, NoteStatus, Severity } from '../lib/types'
+import { CopyButton } from './CopyButton'
 
 const SEVERITIES: Severity[] = ['blocker', 'major', 'minor', 'nit', 'question', 'praise']
 
@@ -12,11 +14,12 @@ const STATUS_ACTIONS: { status: NoteStatus; label: string; title: string }[] = [
 ]
 
 export function NoteCard({
-  note, onChanged, showLocation = false,
+  note, onChanged, showLocation = false, onJump,
 }: {
   note: Note
   onChanged: () => void
   showLocation?: boolean
+  onJump?: (note: Note) => void
 }) {
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -35,30 +38,22 @@ export function NoteCard({
   const setStatus = (status: NoteStatus) => act(() => api.patchNote(note.id, { status }))
   const setSeverity = (severity: Severity) => act(() => api.patchNote(note.id, { severity }))
 
-  const location = note.file_path
-    ? `${note.file_path}${note.line_start ? `:${note.line_start}` : ''}`
-    : 'general'
+  const location = noteLocation(note) || 'general'
 
   return (
     <div
       className={`note ${note.status}`}
       style={{ ['--sev' as string]: `var(--sev-${note.severity})` }}
+      id={`note-${note.id}`}
     >
       <div className="note-head">
         <select
-          className="sev"
+          className={`sev-select sev-${note.severity}`}
           value={note.severity}
           disabled={busy}
           onChange={(e) => setSeverity(e.target.value as Severity)}
-          style={{
-            background: 'transparent',
-            border: '1px solid var(--border)',
-            borderRadius: 4,
-            color: `var(--sev-${note.severity})`,
-            padding: '1px 4px',
-            cursor: 'pointer',
-          }}
           title="Change severity"
+          aria-label="Severity"
         >
           {SEVERITIES.map((s) => (
             <option key={s} value={s}>{s}</option>
@@ -69,6 +64,7 @@ export function NoteCard({
           <input
             className="input"
             value={draft.title}
+            aria-label="Note title"
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
             style={{ flex: 1 }}
           />
@@ -85,7 +81,19 @@ export function NoteCard({
           </span>
         )}
         {note.status !== 'open' && <span className="chip">{note.status}</span>}
-        {showLocation && <span className="chip mono faint">{location}</span>}
+        {showLocation && (
+          onJump && note.file_path ? (
+            <button
+              className="chip mono loc-link"
+              onClick={() => onJump(note)}
+              title="Show this line in the diff"
+            >
+              {location} ↗
+            </button>
+          ) : (
+            <span className="chip mono faint">{location}</span>
+          )
+        )}
       </div>
 
       {editing ? (
@@ -93,6 +101,7 @@ export function NoteCard({
           <textarea
             className="input mono"
             rows={8}
+            aria-label="Note body"
             value={draft.body}
             onChange={(e) => setDraft({ ...draft, body: e.target.value })}
           />
@@ -144,6 +153,14 @@ export function NoteCard({
           </>
         ) : (
           <>
+            <CopyButton
+              className="btn sm"
+              label="Copy"
+              title={showLocation
+                ? 'Copy this note, with its file and line, ready to paste'
+                : 'Copy this note ready to paste as a review comment on this line'}
+              text={() => noteToMarkdown(note, { withLocation: showLocation })}
+            />
             {note.status === 'open' ? (
               STATUS_ACTIONS.map((a) => (
                 <button
@@ -176,6 +193,7 @@ export function NoteCard({
             <button
               className="btn ghost sm danger"
               disabled={busy}
+              title="Delete this note"
               onClick={() => act(() => api.deleteNote(note.id))}
             >
               Delete

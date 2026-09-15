@@ -92,9 +92,13 @@ export function FilePane({
                 <span className="dot" />
               </span>
             )}
-            {/* bdi keeps the RTL trick used for path-tail ellipsis from
-                reordering punctuation in the visible tail */}
-            <span className="fname"><bdi>{f.path}</bdi></span>
+            <span className="fname" title={f.path}>
+              {f.path.includes('/') && (
+                <span className="fdir">{f.path.slice(0, f.path.lastIndexOf('/') + 1)}</span>
+              )}
+              <span className="fbase">{f.path.slice(f.path.lastIndexOf('/') + 1)}</span>
+            </span>
+            {worst && <span className="fcount">{worst.count}</span>}
             <span className="fstat">
               <span className="a">+{f.additions}</span> <span className="d">−{f.deletions}</span>
             </span>
