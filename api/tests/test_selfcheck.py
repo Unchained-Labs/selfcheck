@@ -445,3 +445,94 @@ def test_gitlab_prefers_the_real_clone_url_when_it_can_read_it():
     )
     meta = asyncio.run(provider.fetch_meta(ref))
     assert meta.clone_url == "https://gitlab.com/grp/renamed.git"
+
+
+# ── language-aware review guidance ─────────────────────────────────────────
+
+
+def test_detect_languages_weights_by_churn():
+    from selfcheck.prompts import detect_languages
+
+    files = [
+        {"path": "src/tree_publisher.cpp", "additions": 86, "deletions": 0},
+        {"path": "include/tree_publisher.hpp", "additions": 55, "deletions": 0},
+        {"path": "docs/index.md", "additions": 28, "deletions": 0},
+        {"path": "CMakeLists.txt", "additions": 4, "deletions": 1},
+    ]
+    assert detect_languages(files) == ["C++"]
+
+
+def test_detect_languages_treats_dot_h_as_cpp_only_alongside_cpp():
+    from selfcheck.prompts import detect_languages
+
+    assert detect_languages(
+        [{"path": "a.cpp", "additions": 50, "deletions": 0},
+         {"path": "b.h", "additions": 40, "deletions": 0}]
+    ) == ["C++"]
+    # A lone .h change has no C++ evidence, so claim nothing.
+    assert detect_languages([{"path": "b.h", "additions": 40, "deletions": 0}]) == []
+
+
+def test_detect_languages_reports_a_genuinely_mixed_change():
+    from selfcheck.prompts import detect_languages
+
+    langs = detect_languages(
+        [{"path": "a.cpp", "additions": 100, "deletions": 0},
+         {"path": "b.py", "additions": 90, "deletions": 0}]
+    )
+    assert set(langs) == {"C++", "Python"}
+
+
+def test_detect_languages_ignores_incidental_files():
+    from selfcheck.prompts import detect_languages
+
+    assert detect_languages([{"path": "README.md", "additions": 10, "deletions": 1}]) == []
+    assert detect_languages([]) == []
+
+
+def test_cpp_guidance_reaches_the_prompt_and_python_guidance_does_not():
+    from selfcheck.prompts import build_review_prompt
+
+    files = [
+        {"path": "src/tree_publisher.cpp", "status": "added", "additions": 86, "deletions": 0},
+        {"path": "include/tree_publisher.hpp", "status": "added", "additions": 55, "deletions": 0},
+    ]
+    prompt = build_review_prompt(
+        meta={"provider": "gitlab", "number": 34, "namespace": "g", "project": "p",
+              "host": "gitlab.com", "title": "t", "base_ref": "main", "head_ref": "f",
+              "head_sha": "a" * 40, "state": "open", "changed_files": 2,
+              "additions": 141, "deletions": 0, "description": "", "commits": []},
+        diff_text="@@",
+        diff_truncated=False,
+        worktree="/tmp/wt",
+        file_list=files,
+    )
+    assert "## Language-specific checks" in prompt
+    assert "### C++" in prompt
+    assert "Rule of zero" in prompt
+    assert "### Python" not in prompt
+
+
+def test_prompt_has_no_language_section_for_a_docs_only_change():
+    from selfcheck.prompts import build_review_prompt
+
+    prompt = build_review_prompt(
+        meta={"provider": "github", "number": 1, "namespace": "g", "project": "p",
+              "host": "github.com", "title": "t", "base_ref": "main", "head_ref": "f",
+              "head_sha": "a" * 40, "state": "open", "changed_files": 1,
+              "additions": 3, "deletions": 0, "description": "", "commits": []},
+        diff_text="@@",
+        diff_truncated=False,
+        worktree=None,
+        file_list=[{"path": "README.md", "status": "modified", "additions": 3, "deletions": 0}],
+    )
+    assert "## Language-specific checks" not in prompt
+
+
+def test_system_prompt_demands_fit_with_surrounding_code():
+    """The 'alignment with the unchanged stack' instruction is load-bearing."""
+    from selfcheck.prompts import SYSTEM_APPEND
+
+    assert "Fit with the code around it" in SYSTEM_APPEND
+    for cue in ("already an abstraction", "call site", "local convention", "right layer"):
+        assert cue.lower() in SYSTEM_APPEND.lower(), cue

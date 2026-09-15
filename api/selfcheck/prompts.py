@@ -19,10 +19,31 @@ Review quality bar:
 - Prefer a small number of findings that are demonstrably real over broad
   speculation. A reviewer who cries wolf gets ignored.
 - Anchor each finding to the narrowest line range that shows the problem.
-- Judge the change against the code around it: match existing patterns, naming,
-  error handling and test conventions rather than importing your own taste.
 - Say what breaks and under what input/state. "This could be a problem" is not
   a finding; "if `items` is empty, line 42 raises IndexError" is.
+
+Fit with the code around it:
+This matters as much as correctness. A change that works but does not belong
+costs the codebase more than a small bug does. The diff is a fraction of the
+program — read the unchanged code it lands in and judge the change against it,
+not against your own preferences:
+- Is there already an abstraction for this? Look for an existing helper, base
+  class, utility or pattern that the new code reimplements or bypasses. Name the
+  file and symbol you found.
+- Does it match local convention? Naming, error handling, logging, parameter
+  order, ownership style, header layout, test structure — take these from the
+  neighbouring files, not from general practice.
+- Did every affected call site move with it? Grep for callers of anything whose
+  signature, semantics or lifetime changed, and check each one. A caller left
+  behind is a real finding, not a nit.
+- Is the same idea now expressed two ways? Duplicated logic, a second source of
+  truth, or a parallel code path that will drift from the original.
+- Does it sit at the right layer? Logic pushed into the wrong module, a
+  dependency pointing the wrong way, or an interface widened when a caller-side
+  change would have done.
+Where the surrounding code and general best practice disagree, follow the
+surrounding code and say so — unless the existing pattern is what causes the
+bug, which is itself worth a note.
 """
 
 OUTPUT_CONTRACT = """\
@@ -71,6 +92,173 @@ Severity means:
 - question : you cannot tell whether it is correct without the author's intent.
 - praise   : worth calling out. At most one or two.
 """
+
+
+
+# ── language-specific review criteria ──────────────────────────────────────
+#
+# Injected only for the languages a given diff actually touches, so a Python
+# change is never lectured about RAII and a C++ change gets asked the questions
+# that matter for C++.
+
+CPP_GUIDANCE = """\
+### C++
+
+**Ownership and lifetime**
+- Who owns each allocation, and does the type say so? Raw owning pointers,
+  `new`/`delete`, or `shared_ptr` where `unique_ptr` expresses the intent.
+- Dangling: a reference, `string_view` or `span` outliving its buffer; a pointer
+  into a vector that may reallocate; a lambda capturing by reference and then
+  escaping the frame; returning a reference to a local.
+- Rule of zero. A class declaring a destructor, copy constructor or copy
+  assignment but not the rest is usually wrong; prefer no user-declared special
+  members at all.
+- A virtual destructor on anything deleted through a base pointer, and object
+  slicing where a derived value is copied into a base.
+
+**Correctness**
+- Members left uninitialised by a constructor.
+- Member initialisation runs in declaration order, not in the order written in
+  the init list.
+- Signed/unsigned comparison, narrowing, and `.size()` compared against `int`.
+- Iterator, pointer and reference invalidation after a container is mutated.
+- Overflow, shifts at or beyond the width, and the other undefined-behaviour
+  classics.
+
+**Interfaces**
+- `const&` for anything non-trivial to copy; by value only to sink and move.
+- `const`-correctness on methods and parameters, `explicit` on single-argument
+  constructors, `[[nodiscard]]` where dropping the result is a bug.
+- `noexcept` where it is claimed, and on move operations that containers need.
+
+**Resources and errors**
+- RAII for every resource — locks, files, sockets, handles. A manual
+  unlock/close on a path that can throw or return early is a finding.
+- Exception safety: what leaks if the middle of this function throws?
+
+**Concurrency**
+- What guards each shared member, and is it held consistently? Look for a lock
+  taken in one order here and another order elsewhere, an atomic standing in for
+  a mutex, or state shared between a callback thread and the main loop.
+
+**Headers and build**
+- Include what you use; forward-declare instead where you can; never
+  `using namespace` at namespace scope in a header.
+- Non-inline definitions in a header (ODR), and missing include guards.
+
+If this project is ROS, embedded, or has a real-time loop, also weigh
+allocations and lock acquisition in hot paths, and callback re-entrancy.
+"""
+
+PYTHON_GUIDANCE = """\
+### Python
+
+- Mutable default arguments, and state shared across calls by accident.
+- Exceptions caught too broadly, swallowed, or re-raised in a way that loses the
+  traceback; `finally`/context managers for anything that must be released.
+- Resource lifetime: files, sockets and locks opened without `with`.
+- In async code: blocking calls on the event loop, un-awaited coroutines, and
+  tasks created without a reference held.
+- Type hints that disagree with what the function actually returns or accepts,
+  including `Optional` that is never checked.
+"""
+
+TS_GUIDANCE = """\
+### TypeScript / JavaScript
+
+- `any`, unchecked casts and non-null assertions that hide a real nullable.
+- Promises not awaited, floating rejections, and `await` inside a loop where the
+  work is independent.
+- In React: missing or over-broad effect dependencies, state updated from a
+  stale closure, keys derived from an index, and work done on every render that
+  should be memoised.
+- Equality and coercion at boundaries where the input is not actually typed.
+"""
+
+GO_GUIDANCE = """\
+### Go
+
+- Errors dropped, wrapped without context, or compared by string.
+- Goroutine lifetime: who cancels it, and does the context reach it?
+- Deferred cleanup inside a loop, and mutexes copied by value.
+- Slice aliasing after `append`, and nil map writes.
+"""
+
+RUST_GUIDANCE = """\
+### Rust
+
+- `unwrap`/`expect` on a path that can realistically fail.
+- `unsafe` blocks: what invariant is being upheld, and is it documented?
+- Lifetimes widened or `clone()` used to silence the borrow checker where the
+  design wanted a borrow.
+- Blocking calls inside async, and locks held across an `.await`.
+"""
+
+LANGUAGE_GUIDANCE: dict[str, str] = {
+    "C++": CPP_GUIDANCE,
+    "Python": PYTHON_GUIDANCE,
+    "TypeScript": TS_GUIDANCE,
+    "Go": GO_GUIDANCE,
+    "Rust": RUST_GUIDANCE,
+}
+
+_CPP_EXT = {".cpp", ".cc", ".cxx", ".c++", ".hpp", ".hh", ".hxx", ".h++", ".ipp", ".tpp"}
+_EXT_LANG = {
+    ".py": "Python", ".pyi": "Python",
+    ".ts": "TypeScript", ".tsx": "TypeScript", ".js": "TypeScript",
+    ".jsx": "TypeScript", ".mjs": "TypeScript", ".cjs": "TypeScript",
+    ".go": "Go",
+    ".rs": "Rust",
+}
+
+
+def detect_languages(file_list: list[dict[str, Any]], *, limit: int = 2) -> list[str]:
+    """Which languages this diff is mostly written in, weighted by churn.
+
+    Weighted rather than counted so a change that is one C++ file plus twenty
+    one-line YAML edits is still reviewed as C++.
+    """
+    weights: dict[str, int] = {}
+    exts: set[str] = set()
+    for f in file_list:
+        path = str(f.get("path") or "")
+        dot = path.rfind(".")
+        if dot == -1:
+            continue
+        ext = path[dot:].lower()
+        exts.add(ext)
+        churn = int(f.get("additions") or 0) + int(f.get("deletions") or 0) or 1
+        lang = "C++" if ext in _CPP_EXT else _EXT_LANG.get(ext)
+        if lang:
+            weights[lang] = weights.get(lang, 0) + churn
+
+    # `.h` is C or C++; treat it as C++ only when the change also touches
+    # unambiguously C++ files, which is the common case for a C++ project.
+    if ".h" in exts and "C++" in weights:
+        for f in file_list:
+            if str(f.get("path") or "").lower().endswith(".h"):
+                churn = int(f.get("additions") or 0) + int(f.get("deletions") or 0) or 1
+                weights["C++"] += churn
+
+    if not weights:
+        return []
+    total = sum(weights.values())
+    ranked = sorted(weights.items(), key=lambda kv: -kv[1])
+    # Only mention a second language if it is a real part of the change.
+    return [lang for lang, w in ranked[:limit] if w == ranked[0][1] or w / total >= 0.15]
+
+
+def language_section(file_list: list[dict[str, Any]]) -> str:
+    langs = [lang for lang in detect_languages(file_list) if lang in LANGUAGE_GUIDANCE]
+    if not langs:
+        return ""
+    body = "\n".join(LANGUAGE_GUIDANCE[lang] for lang in langs)
+    return (
+        "## Language-specific checks\n\n"
+        "This change is mostly " + " and ".join(langs) + ". Work through these as "
+        "well as the general bar — but only report what you can actually show in "
+        "this diff or the checkout.\n\n" + body
+    )
 
 
 def _fmt_commits(commits: list[dict[str, Any]], limit: int = 30) -> str:
@@ -182,6 +370,10 @@ def build_review_prompt(
             "## Changed since your last review\n\n"
             f"{rows}\n\nSpend your effort here first, but keep the whole change in view."
         )
+
+    lang_section = language_section(file_list)
+    if lang_section:
+        parts.append(lang_section)
 
     if guidance.strip():
         parts.append(f"## Reviewer's instructions\n\n{guidance.strip()}")
