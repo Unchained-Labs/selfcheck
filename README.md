@@ -203,6 +203,21 @@ selfcheck/
 6. Parse the JSON block out of the reply, store the notes, stream progress to
    the UI over SSE.
 
+### How the notes are written
+
+The prompt specifies the prose, not just the analysis: conclusion first and
+bolded, plain words and active voice, three to six short sentences, one finding
+per note, a line or two teaching the underlying idea in ordinary language, and a
+closing sentence saying what to do. Polite about the author, never vague about
+the facts.
+
+Adjectives alone did not work. Measured across re-reviews of the same pull
+request, telling the model to be concise made notes 26% *longer*; adding numeric
+limits (900 characters a note, 250 a paragraph, one bolded span) and a worked
+example of a good note brought the median body from 763 to 644 characters and
+the longest paragraph from 358 to 261, with nothing over budget. If you retune
+this, re-measure rather than trusting the wording.
+
 On a re-review, the previous run's notes and the list of files touched since
 then go into the prompt, so findings that still hold keep their titles and the
 summary can say what changed.

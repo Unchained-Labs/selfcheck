@@ -536,3 +536,106 @@ def test_system_prompt_demands_fit_with_surrounding_code():
     assert "Fit with the code around it" in SYSTEM_APPEND
     for cue in ("already an abstraction", "call site", "local convention", "right layer"):
         assert cue.lower() in SYSTEM_APPEND.lower(), cue
+
+
+# ── how the review is written ──────────────────────────────────────────────
+
+
+def test_prompt_specifies_the_writing_style():
+    """Style adjectives alone do not move a model; the prompt has to say what
+    they mean in checkable terms."""
+    from selfcheck.prompts import SYSTEM_APPEND
+
+    assert "How to write it:" in SYSTEM_APPEND
+    style = SYSTEM_APPEND.split("How to write it:", 1)[1].lower()
+
+    # skimmable / ADHD-friendly
+    for cue in ("lead with the conclusion", "one finding per note", "break it up",
+                "bullet list", "wall of text"):
+        assert cue in style, cue
+
+    # human readable
+    for cue in ("plain words", "active voice", "short sentences"):
+        assert cue in style, cue
+
+    # educational but accessible
+    for cue in ("teach the idea", "why it matters", "talking down"):
+        assert cue in style, cue
+
+    # polite, without going vague
+    for cue in ("critique the code, not the person", "no sarcasm"):
+        assert cue in style, cue
+    assert "politeness is about tone, never about facts" in style
+
+
+def test_style_guidance_does_not_license_hedging():
+    """Politeness must not turn into unusable vagueness — the prompt says so
+    explicitly, and that sentence is the one doing the work."""
+    from selfcheck.prompts import SYSTEM_APPEND
+
+    style = SYSTEM_APPEND.split("How to write it:", 1)[1]
+    assert "Do not soften a real finding" in style
+    assert "do not hedge on something you have actually verified" in style
+
+
+def test_output_contract_matches_the_style_rules():
+    from selfcheck.prompts import OUTPUT_CONTRACT
+
+    assert "conclusion first" in OUTPUT_CONTRACT.lower()
+    assert "plain language" in OUTPUT_CONTRACT.lower()
+
+
+def test_skill_and_engine_agree_on_style():
+    """The bundled skill drives the same job from an interactive session, so a
+    reviewer should not be able to tell which one wrote the notes."""
+    import pathlib
+
+    from selfcheck.prompts import SYSTEM_APPEND
+
+    skill = pathlib.Path(__file__).resolve().parents[2] / "skill" / "selfcheck" / "SKILL.md"
+    text = skill.read_text().lower()
+    style = SYSTEM_APPEND.lower()
+
+    for cue in ("conclusion first", "one finding per note", "plain words",
+                "critique the code, not the person", "politeness is tone"):
+        assert cue in text, f"skill is missing: {cue}"
+    for cue in ("lead with the conclusion", "one finding per note"):
+        assert cue in style, cue
+
+
+def test_prompt_gives_checkable_limits_not_just_adjectives():
+    """Measured against a real PR, style prose alone made notes *longer*.
+    Numeric limits plus a worked example are what actually moved them."""
+    from selfcheck.prompts import SYSTEM_APPEND
+
+    assert "Hard limits" in SYSTEM_APPEND
+    limits = SYSTEM_APPEND.split("Hard limits", 1)[1]
+    assert "900 characters" in limits
+    assert "250 characters" in limits
+    assert "three sentences" in limits
+    assert "Bold exactly one span per note" in limits
+
+
+def test_prompt_carries_a_worked_example_of_a_good_note():
+    """Few-shot beats instruction for style transfer, so the example has to
+    demonstrate the shape it asks for."""
+    from selfcheck.prompts import SYSTEM_APPEND
+
+    assert "This is the shape to aim for:" in SYSTEM_APPEND
+    example = SYSTEM_APPEND.split("This is the shape to aim for:", 1)[1]
+    body = example.split("Three short paragraphs")[0]
+
+    paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
+    assert len(paragraphs) == 3, "the example must model a three-paragraph note"
+    assert paragraphs[0].lstrip().startswith("**"), "it must open with the bolded conclusion"
+    assert body.count("**") == 2, "exactly one bolded span, as the rule requires"
+    for para in paragraphs:
+        flat = " ".join(para.split())
+        assert len(flat) <= 250, f"example paragraph breaks its own limit: {len(flat)}"
+
+
+def test_output_contract_states_the_body_budget():
+    from selfcheck.prompts import OUTPUT_CONTRACT
+
+    assert "<= 900 chars" in OUTPUT_CONTRACT
+    assert "<= 4 paragraphs" in OUTPUT_CONTRACT

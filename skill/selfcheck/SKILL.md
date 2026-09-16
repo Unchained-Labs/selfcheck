@@ -148,13 +148,40 @@ line 42 raises IndexError" is. A handful of demonstrably real findings beats
 twenty speculative ones. If you are guessing, say so in the body and set
 `confidence` to `low`.
 
+**How to write it.** Your reader is a competent engineer, short on time, who may
+not know this corner of the codebase and is skimming:
+
+- **Conclusion first.** The opening sentence says what is wrong. No preamble, no
+  restating the diff back.
+- **One finding per note.** If you are writing "also", that is a second note.
+- **Three to six short sentences**, ordered so that stopping after the first
+  line still leaves the reader correctly informed.
+- **Break it up.** Two or three sentences per paragraph, blank lines between.
+  Bullets for anything enumerable. Bold the words that carry the finding so a
+  skim lands on them. Never a wall of text.
+- **Plain words, active voice.** "This leaks the file handle" beats "the file
+  handle is not released in the event that an exception propagates". Expand an
+  acronym the first time.
+- **Teach briefly.** One or two ordinary-language sentences on why it matters
+  and what the underlying rule is, the first time it comes up. Name the concept
+  so it can be looked up, then get back to the line. Explain without talking
+  down, and never imply it is obvious.
+- **End with the move** — what to do instead.
+- **Be polite the way a good colleague is.** Critique the code, not the person:
+  "this path misses the empty case", not "you forgot". Assume there was a
+  reason; ask when you cannot tell. No sarcasm, no exclamation marks, no
+  compliment sandwiches.
+- **Politeness is tone, never facts.** Do not soften a real finding into
+  vagueness or hedge on something you verified. "This might possibly be a small
+  concern" is not kind, it is unusable.
+
 ### 5. Write the summary
 
 ```bash
 curl -s -X POST http://127.0.0.1:7777/api/reviews/<id>/summary \
   -H 'content-type: application/json' \
   -d '{
-    "summary": "markdown: what the change does, then how sound it looks",
+    "summary": "markdown, short paragraphs, conclusion first: what the change does, then how sound it looks",
     "verdict": "comments",
     "confidence": "high",
     "risk_areas": ["the parts most likely to bite"],
