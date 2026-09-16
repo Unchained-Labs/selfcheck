@@ -639,3 +639,108 @@ def test_output_contract_states_the_body_budget():
 
     assert "<= 900 chars" in OUTPUT_CONTRACT
     assert "<= 4 paragraphs" in OUTPUT_CONTRACT
+
+
+# ── re-reviews replace, rather than accumulate ─────────────────────────────
+
+
+@pytest.fixture()
+def temp_db(tmp_path, monkeypatch):
+    """A throwaway database for tests that write."""
+    from selfcheck import db as dbmod
+    from selfcheck.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("SELFCHECK_DATA_DIR", str(tmp_path))
+    dbmod._local.__dict__.clear()
+    dbmod.init_db()
+    yield dbmod
+    dbmod._local.__dict__.clear()
+    get_settings.cache_clear()
+
+
+def _seed_review(dbmod):
+    from selfcheck import service
+
+    rid = dbmod.new_id("rev")
+    ts = dbmod.now()
+    with dbmod.tx() as c:
+        c.execute(
+            "INSERT INTO reviews (id, provider, host, namespace, project, number, url,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (rid, "github", "github.com", "o", "r", 1, "u", ts, ts),
+        )
+    return rid, service
+
+
+def test_rereview_replaces_the_previous_runs_findings(temp_db):
+    """Three runs of the same PR used to leave three copies of every finding."""
+    rid, service = _seed_review(temp_db)
+    finding = [{"file": "a.py", "line_start": 1, "title": "Leaks a handle", "body": "x"}]
+
+    for run in ("run_1", "run_2", "run_3"):
+        service.add_notes(
+            rid, finding, run_id=run, origin="claude",
+            carry_status=service.supersede_claude_notes(rid),
+        )
+
+    notes = service.list_notes(rid)
+    assert len(notes) == 1, f"expected one finding, got {len(notes)}"
+    assert notes[0]["run_id"] == "run_3", "the surviving note is from the latest run"
+
+
+def test_rereview_keeps_your_own_notes(temp_db):
+    rid, service = _seed_review(temp_db)
+    service.add_notes(rid, [{"file": "a.py", "title": "Mine", "body": ""}], origin="human")
+    service.add_notes(
+        rid, [{"file": "a.py", "title": "Claude's"}], run_id="r1", origin="claude",
+        carry_status=service.supersede_claude_notes(rid),
+    )
+    service.add_notes(
+        rid, [{"file": "a.py", "title": "Claude's"}], run_id="r2", origin="claude",
+        carry_status=service.supersede_claude_notes(rid),
+    )
+
+    titles = sorted(n["title"] for n in service.list_notes(rid))
+    assert titles == ["Claude's", "Mine"], "a human note must survive a re-review"
+
+
+def test_rereview_does_not_resurrect_a_dismissed_finding(temp_db):
+    """If you dismissed something, saying it again should not reopen it."""
+    rid, service = _seed_review(temp_db)
+    created = service.add_notes(
+        rid, [{"file": "a.py", "title": "Not a real problem"}], run_id="r1", origin="claude",
+    )
+    service.update_note(created[0]["id"], {"status": "dismissed"})
+
+    service.add_notes(
+        rid, [{"file": "a.py", "title": "  not a REAL problem  "}], run_id="r2",
+        origin="claude", carry_status=service.supersede_claude_notes(rid),
+    )
+
+    notes = service.list_notes(rid)
+    assert len(notes) == 1
+    assert notes[0]["status"] == "dismissed", "your decision must carry across the re-review"
+    assert notes[0]["run_id"] == "r2"
+
+
+def test_rereview_reopens_nothing_it_did_not_reissue(temp_db):
+    """A finding the new run drops is gone, not left hanging around as open."""
+    rid, service = _seed_review(temp_db)
+    service.add_notes(
+        rid,
+        [{"file": "a.py", "title": "Fixed since"}, {"file": "a.py", "title": "Still broken"}],
+        run_id="r1", origin="claude",
+    )
+    service.add_notes(
+        rid, [{"file": "a.py", "title": "Still broken"}], run_id="r2", origin="claude",
+        carry_status=service.supersede_claude_notes(rid),
+    )
+    assert [n["title"] for n in service.list_notes(rid)] == ["Still broken"]
+
+
+def test_normalise_title_absorbs_only_harmless_drift():
+    from selfcheck.service import normalise_title
+
+    assert normalise_title("  The  Thing\nbroke ") == "the thing broke"
+    assert normalise_title("A") != normalise_title("B")

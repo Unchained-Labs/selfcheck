@@ -282,6 +282,38 @@ def _clean_note(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def normalise_title(title: str) -> str:
+    """Loose key for matching a finding across runs. The prompt asks the model
+    to re-issue a still-valid finding under the same title, so whitespace and
+    case are the only drift worth absorbing."""
+    return " ".join(str(title or "").lower().split())
+
+
+def supersede_claude_notes(review_id: str) -> dict[str, str]:
+    """Clear the previous run's findings, returning the decisions you had
+    already made on them.
+
+    A re-review replaces the last review rather than piling a second copy of
+    every finding on top of it. Two things survive: notes you wrote yourself,
+    which are never touched, and any verdict you reached — resolved, dismissed,
+    won't fix — which carries across to the re-issued finding so a re-review
+    cannot resurrect something you have already dealt with.
+    """
+    conn = db.get_conn()
+    rows = conn.execute(
+        "SELECT title, status FROM notes WHERE review_id=? AND origin='claude'",
+        (review_id,),
+    ).fetchall()
+    decided = {
+        normalise_title(r["title"]): r["status"]
+        for r in rows
+        if r["status"] != "open" and r["title"]
+    }
+    with db.tx() as c:
+        c.execute("DELETE FROM notes WHERE review_id=? AND origin='claude'", (review_id,))
+    return decided
+
+
 def add_notes(
     review_id: str,
     raw_notes: list[dict[str, Any]],
@@ -289,15 +321,18 @@ def add_notes(
     run_id: str = "",
     origin: str = "claude",
     anchor_sha: str = "",
+    carry_status: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     get_review(review_id)  # existence check
     ts = db.now()
     created: list[str] = []
+    carry_status = carry_status or {}
     with db.tx() as c:
         for raw in raw_notes:
             n = _clean_note(raw)
             if not n["title"] and not n["body"]:
                 continue
+            status = carry_status.get(normalise_title(n["title"]), "open")
             nid = db.new_id("note")
             created.append(nid)
             c.execute(
@@ -308,7 +343,7 @@ def add_notes(
                 (
                     nid, review_id, run_id, n["file_path"], n["line_start"], n["line_end"],
                     n["side"], n["severity"], n["category"], n["title"], n["body"],
-                    n["suggestion"], n["confidence"], "open", origin, anchor_sha, ts, ts,
+                    n["suggestion"], n["confidence"], status, origin, anchor_sha, ts, ts,
                 ),
             )
     conn = db.get_conn()
@@ -613,8 +648,10 @@ async def _execute_run(run_id: str, guidance: str = "") -> None:
             return
 
         notes = parsed.get("notes") or []
+        # This run is the review now; the previous one's findings step aside.
+        carried = supersede_claude_notes(review_id)
         add_notes(review_id, notes, run_id=run_id, origin="claude",
-                  anchor_sha=review["head_sha"])
+                  anchor_sha=review["head_sha"], carry_status=carried)
 
         verdict = str(parsed.get("verdict") or "").lower()
         if verdict not in ("looks_good", "comments", "needs_work"):

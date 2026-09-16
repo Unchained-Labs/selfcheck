@@ -222,6 +222,13 @@ On a re-review, the previous run's notes and the list of files touched since
 then go into the prompt, so findings that still hold keep their titles and the
 summary can say what changed.
 
+A completed run then **replaces** the previous run's findings rather than adding
+a second copy of each. Two things survive that: notes you wrote yourself, which
+are never touched, and any decision you already made — resolved, dismissed,
+won't fix — which carries across to the re-issued finding by title, so a
+re-review cannot resurrect something you have dealt with. A finding the new run
+drops simply goes away; earlier verdicts and summaries stay in the run history.
+
 ## API
 
 `GET /docs` has the full interactive schema. The endpoints an agent needs:
