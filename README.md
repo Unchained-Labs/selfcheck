@@ -43,8 +43,9 @@ diff UI, adding your own notes, a live re-review, and the light theme.
 ## Requirements
 
 - Python 3.11+ and [`uv`](https://docs.astral.sh/uv/)
-- Node 20+ and `pnpm` (only to build the UI)
-- `git`
+- Node 20+ with corepack (only to build the UI)
+- `git`, and `make` if you want the shortcuts
+- Docker with Compose v2, if you would rather run it in a container
 - [Claude Code](https://claude.com/claude-code) installed and authenticated
   (`claude --version` should work)
 - A read-scoped token for each forge you use
@@ -54,12 +55,49 @@ diff UI, adding your own notes, a live re-review, and the light theme.
 ```bash
 git clone <this repo> selfcheck && cd selfcheck
 cp .env.example .env     # then fill in tokens, or export them in your shell
-scripts/build.sh         # build the web UI
-scripts/serve.sh         # http://127.0.0.1:7777
+make setup               # install Python and web dependencies
+make build serve         # http://127.0.0.1:7777
 ```
 
-`scripts/dev.sh` instead runs the API with reload plus the Vite dev server on
-`:5173`, proxying `/api` to the backend.
+`make` is a thin wrapper over `scripts/`; `make help` lists every target, and
+each one runs a script you could just as well run by hand.
+
+| | |
+| --- | --- |
+| `make dev` | API with reload + the Vite dev server on `:5173` |
+| `make build serve` | build the UI and serve everything as one process |
+| `make check` | tests and typecheck |
+| `make smoke` | browser smoke test against a running instance |
+| `make status` | ask a running instance what it can currently do |
+| `make skill` | install the Claude skill |
+| `make up` / `make down` | the same stack in Docker |
+
+### Docker
+
+```bash
+make up          # build and start, on http://127.0.0.1:7777
+make logs        # follow it
+make down        # stop it
+```
+
+Two things are mounted from the host rather than baked into the image:
+
+- **`./data`** — the database, repo mirrors and worktrees, so a rebuild never
+  costs you your reviews or a re-clone.
+- **`~/.claude`** — your Claude Code credentials. The review engine runs the
+  real CLI, so it needs real auth. **This mounts your actual credentials into
+  the container.** If you would rather not, comment out the two `~/.claude`
+  lines in `compose.yaml` and set `ANTHROPIC_API_KEY` in `.env` instead.
+
+The container runs as your uid (the Makefile passes it through), so files it
+writes into `./data` stay yours. The port is published to `127.0.0.1` only —
+selfcheck has no authentication, so do not widen that without putting something
+in front of it.
+
+Node and pnpm are pinned (`packageManager` in `web/package.json`, routed
+through corepack by `scripts/_node.sh`). Without that, whichever pnpm happens to
+be first on your PATH wins, and pnpm 10 and 11 disagree enough to reject the
+workspace file or interactively offer to wipe `node_modules` mid-build.
 
 ### Tokens
 
@@ -87,6 +125,13 @@ SELFCHECK_HOST_TOKENS={"gitlab.corp.io":"glpat-…","ghe.corp.io":"ghp_…"}
 
 `GET /api/status` reports which hosts have a token and whether the Claude CLI is
 reachable; the sidebar footer shows the same thing.
+
+Nothing in selfcheck ever prints a token: `/api/status` reports a boolean per
+host, and git is handed credentials through `GIT_ASKPASS` rather than a config
+file. Be careful with the tools around it, though — `docker compose config`
+interpolates `.env` and prints every secret in it in cleartext, so read
+`compose.yaml` directly instead. If a token does reach your scrollback, treat it
+as leaked and regenerate it; both forges make that a two-click operation.
 
 ### Getting the notes out
 
@@ -185,6 +230,9 @@ selfcheck/
   web/            React 19 + Vite + Shiki. No UI framework, no router.
   skill/selfcheck/  the Claude Code skill
   scripts/        serve, dev, build, test, smoke-ui, install-skill
+  Makefile        thin wrappers over the above; `make help`
+  Dockerfile      multi-stage: node builds the UI, runtime adds the Claude CLI
+  compose.yaml    the stack, with ./data and ~/.claude mounted in
   data/           SQLite db, repo mirrors, worktrees, run logs  (gitignored)
 ```
 

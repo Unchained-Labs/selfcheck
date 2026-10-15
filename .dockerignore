@@ -1,0 +1,19 @@
+# Runtime state: the database, repo mirrors and worktrees are a volume, not
+# image content.
+data/
+.env
+
+# Built or installed artefacts — the image builds its own.
+web/dist/
+web/node_modules/
+api/.venv/
+**/__pycache__/
+**/*.py[cod]
+.ruff_cache/
+.pytest_cache/
+
+# Not needed to run the app.
+.git/
+docs/
+*.mp4
+*.png
