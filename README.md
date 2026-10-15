@@ -126,6 +126,13 @@ SELFCHECK_HOST_TOKENS={"gitlab.corp.io":"glpat-…","ghe.corp.io":"ghp_…"}
 `GET /api/status` reports which hosts have a token and whether the Claude CLI is
 reachable; the sidebar footer shows the same thing.
 
+Nothing in selfcheck ever prints a token: `/api/status` reports a boolean per
+host, and git is handed credentials through `GIT_ASKPASS` rather than a config
+file. Be careful with the tools around it, though — `docker compose config`
+interpolates `.env` and prints every secret in it in cleartext, so read
+`compose.yaml` directly instead. If a token does reach your scrollback, treat it
+as leaked and regenerate it; both forges make that a two-click operation.
+
 ### Getting the notes out
 
 selfcheck never posts anything, so copying is the handoff. There are four
