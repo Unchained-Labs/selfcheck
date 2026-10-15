@@ -1,0 +1,56 @@
+# Run the whole stack with: make up      (or: docker compose up -d --build)
+#
+# Two things are mounted from the host rather than built into the image:
+#
+#   ./data        the SQLite database, repo mirrors and read-only worktrees.
+#                 Keeping it outside the image means rebuilding never costs you
+#                 your reviews or a re-clone.
+#
+#   ~/.claude     your Claude Code credentials and state. The review engine
+#                 runs the real CLI, so it needs real auth. This mounts your
+#                 actual credentials into the container — if you would rather
+#                 not, comment both ~/.claude lines out and set ANTHROPIC_API_KEY
+#                 in .env instead.
+
+services:
+  selfcheck:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: selfcheck:local
+    container_name: selfcheck
+
+    # Run as you, so everything written into ./data and ~/.claude stays yours.
+    # Override per-shell with: SELFCHECK_UID=$(id -u) SELFCHECK_GID=$(id -g)
+    user: "${SELFCHECK_UID:-1000}:${SELFCHECK_GID:-1000}"
+
+    # Published to loopback only. selfcheck has no authentication; do not change
+    # this to 0.0.0.0 without putting something in front of it.
+    ports:
+      - "127.0.0.1:${SELFCHECK_PORT:-7777}:7777"
+
+    env_file:
+      - path: .env
+        required: false
+
+    environment:
+      # These win over .env, and must: inside the container the app has to bind
+      # all interfaces and use the mounted data path, whatever .env says.
+      SELFCHECK_HOST: 0.0.0.0
+      SELFCHECK_PORT: 7777
+      SELFCHECK_DATA_DIR: /app/data
+      HOME: /home/app
+
+    volumes:
+      - ./data:/app/data
+      - ${HOME}/.claude:/home/app/.claude
+      - ${HOME}/.claude.json:/home/app/.claude.json
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7777/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

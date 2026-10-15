@@ -1,4 +1,13 @@
-# esbuild ships a prebuilt binary via a postinstall script; Vite cannot run
+# Single package; declared explicitly because pnpm 10 rejects a workspace file
+# without it.
+packages:
+  - '.'
+
+# esbuild ships a prebuilt binary via a postinstall script and Vite cannot run
 # without it. Everything else stays blocked from running install scripts.
+# The two spellings are the same rule: pnpm >= 11 reads allowBuilds, pnpm 10
+# reads onlyBuiltDependencies, and each ignores the other's key.
 allowBuilds:
   esbuild: true
+onlyBuiltDependencies:
+  - esbuild
