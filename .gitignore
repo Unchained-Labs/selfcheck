@@ -22,3 +22,8 @@ dist/
 
 # build caches
 *.tsbuildinfo
+
+# raw screen recordings (branding/video/build.sh turns them into docs/assets/media)
+branding/video/out/
+# the docs site build
+site/

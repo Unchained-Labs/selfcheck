@@ -1,0 +1,2 @@
+# The documentation site (mkdocs.yml). CI installs exactly these.
+mkdocs-material==9.6.23

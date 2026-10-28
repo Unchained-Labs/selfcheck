@@ -8,7 +8,8 @@ name: Release
 #               commit "Release vX.Y.Z" to main and tag it;
 #   3. github - a GitHub release with that changelog section and a source
 #               tarball that includes the built web UI;
-#   4. image  - a multi-arch Docker image on ghcr.io.
+#   4. image  - a multi-arch Docker image on ghcr.io;
+#   5. docs   - the documentation site, rebuilt at the new tag.
 # Pushing a v* tag by hand releases that tag as it is; running the workflow by
 # hand bumps the part you pick. The bump is pushed with the workflow token,
 # which starts no further workflow, so a release never triggers another.
@@ -191,3 +192,16 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  docs:
+    name: Publish the docs
+    needs: [github, image]
+    # Pages deploys from main; a hand-pushed tag waits for the next docs change.
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+    with:
+      ref: ${{ needs.github.outputs.tag }}

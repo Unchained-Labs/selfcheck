@@ -44,6 +44,13 @@ export function repoKey(r: { host: string; namespace: string; project: string })
   return `${r.host}/${r.namespace}/${r.project}`
 }
 
+/** How to show where a repository lives. A local repository's namespace is
+ *  its full parent path, which is noise in a list: show its folder instead. */
+export function nsLabel(r: { host: string; namespace: string }): string {
+  if (r.host !== 'local') return r.namespace
+  return `local · ${r.namespace.split('/').pop() || '/'}`
+}
+
 export function forgeName(provider: string): string {
   return provider === 'github' ? 'GitHub' : provider === 'local' ? 'Local' : 'GitLab'
 }

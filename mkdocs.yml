@@ -1,0 +1,111 @@
+site_name: selfcheck
+site_description: A local, read-only review workbench for pull requests, merge requests and local branches — reviewed by the coding agent you already have.
+site_url: https://unchained-labs.github.io/selfcheck/
+repo_url: https://github.com/Unchained-Labs/selfcheck
+repo_name: Unchained-Labs/selfcheck
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Erwin Lejeune &middot; BSD-3-Clause
+
+theme:
+  name: material
+  logo: assets/brand/mark.svg
+  favicon: assets/brand/favicon.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil-outline
+  features:
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Follow the system
+
+extra_css:
+  - stylesheets/selfcheck.css
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Unchained-Labs/selfcheck
+      name: selfcheck on GitHub
+    - icon: fontawesome/brands/docker
+      link: https://github.com/Unchained-Labs/selfcheck/pkgs/container/selfcheck
+      name: Docker image
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Install: getting-started.md
+      - First review: first-review.md
+  - Guide:
+      - Review engines: engines.md
+      - Reviewing: reviewing.md
+      - Wakeups: wakeups.md
+      - Local branches: local-branches.md
+      - The dashboard: dashboard.md
+      - Settings and spend: configuration.md
+  - How it works:
+      - The read-only promise: read-only.md
+      - Architecture: architecture.md
+      - API: api.md
+  - Project:
+      - Contributing: contributing.md
+      - Changelog: changelog.md
+      - Brand: brand.md
+      - Media: media.md

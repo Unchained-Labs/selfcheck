@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { engineLabel, isRunning, repoKey, scheduleLabel } from '../lib/labels'
+import { engineLabel, isRunning, nsLabel, repoKey, scheduleLabel } from '../lib/labels'
 import { timeAgo } from '../lib/time'
 import type { ThemePref } from '../lib/theme'
 import type { Review, Severity, Status, Wakeup } from '../lib/types'
@@ -117,7 +117,7 @@ export function Sidebar({
     <aside className="sidebar">
       <div className="sidebar-head">
         <div className="brand">
-          <span className="logo" aria-hidden="true"><Icon name="check" size={14} /></span>
+          <img className="logo" src="/mark.svg" alt="" width={26} height={26} />
           <span className="brand-name">selfcheck</span>
           <span className="ro" title="selfcheck never writes to GitHub or GitLab">
             <Icon name="shield" size={11} /> read-only
@@ -192,7 +192,7 @@ export function Sidebar({
                   <Icon name={isCollapsed ? 'chevron-right' : 'chevron-down'} size={13} />
                   <span className="repo-name">
                     <span className="repo-proj">{g.project}</span>
-                    <span className="repo-ns">{g.namespace}</span>
+                    <span className="repo-ns">{nsLabel(g)}</span>
                   </span>
                   {busyCount > 0 ? <Spinner size={11} /> : <span className="repo-count">{g.reviews.length}</span>}
                 </button>

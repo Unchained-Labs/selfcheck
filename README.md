@@ -4,6 +4,9 @@
 [![Release](https://img.shields.io/github/v/release/Unchained-Labs/selfcheck?sort=semver)](https://github.com/Unchained-Labs/selfcheck/releases)
 [![Docker image](https://img.shields.io/badge/ghcr.io-selfcheck-2496ED?logo=docker&logoColor=white)](https://github.com/Unchained-Labs/selfcheck/pkgs/container/selfcheck)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-unchained--labs.github.io%2Fselfcheck-4bdbd4)](https://unchained-labs.github.io/selfcheck/)
+
+<img src="branding/logo/lockup-dark.png" alt="selfcheck" width="360">
 
 A local, self-hosted review workbench for GitHub pull requests and GitLab merge
 requests. Paste a link — or let a wakeup pick new ones up from a repository —
@@ -18,10 +21,12 @@ oriented in someone else's PR faster.
 labels. Notes live in a local SQLite file, and the only way one leaves is you
 copying markdown out of it.
 
-![The review summary](docs/screenshot-review.png)
+![The dashboard](docs/assets/media/screenshot-dashboard.png)
 
-▶ **[Watch the 95-second demo](docs/demo.mp4)** — adding a PR, the review, the
-diff UI, adding your own notes, a live re-review, and the light theme.
+▶ **[Watch the 90-second promo](https://unchained-labs.github.io/selfcheck/media/)**
+and the featurettes — a review start to finish, asking about a finding, a
+second opinion, wakeups, and switching engines — on the
+**[documentation site](https://unchained-labs.github.io/selfcheck/)**.
 
 ---
 
@@ -69,7 +74,7 @@ diff UI, adding your own notes, a live re-review, and the light theme.
 - **An API designed for Claude to drive** — plus a bundled skill, so you can do
   the review from a Claude Code session instead of from the web UI.
 
-![Findings anchored inline in the diff](docs/screenshot-diff.png)
+![Findings anchored inline in the diff](docs/assets/media/screenshot-diff.png)
 
 ## Requirements
 

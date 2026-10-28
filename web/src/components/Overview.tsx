@@ -5,7 +5,7 @@ import {
   type Range,
 } from '../lib/analytics'
 import type { ReviewFilters } from '../lib/filters'
-import { engineLabel, isRunning, MODE_LABEL, scheduleLabel } from '../lib/labels'
+import { engineLabel, isRunning, MODE_LABEL, nsLabel, scheduleLabel } from '../lib/labels'
 import { duration, timeAgo } from '../lib/time'
 import type { Review, Status, Wakeup } from '../lib/types'
 import type { Page } from './Sidebar'
@@ -320,7 +320,7 @@ export function Overview({
                 <button key={r.key} className="recent-repo" onClick={() => onFilter({ repo: r.key })} title="All reviews in this repository">
                   <span className="recent-name">
                     <strong className="truncate">{r.project}</strong>
-                    <span className="faint truncate">{r.namespace}</span>
+                    <span className="faint truncate">{nsLabel({ host: r.key.split('/')[0], namespace: r.namespace })}</span>
                   </span>
                   <span className="recent-spark" title="Reviews per day, last 30 days"><Sparkline values={r.runs30} height={22} /></span>
                   <span className="recent-meta">
