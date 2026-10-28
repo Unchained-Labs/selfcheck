@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import quote
 
 from ..config import get_settings
-from .base import PullMeta, PullRef
+from .base import PullMeta, PullRef, PullSummary, RepoRef
 from .http import ReadOnlyClient
 
 
@@ -75,6 +75,8 @@ class GitHubProvider:
             web_url=pr.get("html_url") or "",
             commits=commits,
             labels=[lbl.get("name", "") for lbl in (pr.get("labels") or [])],
+            assignees=[u.get("login", "") for u in (pr.get("assignees") or []) if u],
+            reviewers=[u.get("login", "") for u in (pr.get("requested_reviewers") or []) if u],
         )
 
     async def fetch_diff(self, ref: PullRef, meta: PullMeta) -> str:
@@ -82,6 +84,27 @@ class GitHubProvider:
         resp = await self._client.get(path, headers={"Accept": "application/vnd.github.v3.diff"})
         resp.raise_for_status()
         return resp.text
+
+    async def list_open_pulls(self, repo: RepoRef, limit: int = 50) -> list[PullSummary]:
+        pulls = await self._client.get_json(
+            f"/repos/{quote(repo.namespace)}/{quote(repo.project)}/pulls",
+            params={"state": "open", "sort": "created", "direction": "desc",
+                    "per_page": min(limit, 100)},
+        )
+        return [
+            PullSummary(
+                number=int(p["number"]),
+                title=p.get("title") or "",
+                author=((p.get("user") or {}).get("login")) or "",
+                draft=bool(p.get("draft")),
+                base_ref=((p.get("base") or {}).get("ref")) or "",
+                head_sha=((p.get("head") or {}).get("sha")) or "",
+                created_at=p.get("created_at") or "",
+                updated_at=p.get("updated_at") or "",
+                web_url=p.get("html_url") or repo.pull_url(int(p["number"])),
+            )
+            for p in pulls
+        ]
 
     def authenticated_clone_url(self, host: str, clone_url: str) -> str:
         if not clone_url or not self._token:

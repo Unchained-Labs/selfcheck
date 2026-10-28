@@ -21,7 +21,8 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
   {
     title: 'Act',
     keys: [
-      ['r', 'Review (or re-review) with Claude'],
+      ['a', 'New review: a PR, an MR or a local branch'],
+      ['r', 'Review (or re-review) with this PR’s depth and engine'],
       ['s', 'Sync with the forge'],
       ['c', 'Copy every open note'],
       ['t', 'Toggle light / dark'],

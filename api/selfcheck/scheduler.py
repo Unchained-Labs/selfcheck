@@ -1,17 +1,22 @@
-"""Background watcher: polls watched reviews and re-reviews when the head moves."""
+"""Background work: re-review watched PRs when the head moves, and fire
+repository wakeups when they are due."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 
-from . import db, service
+from . import db, service, watches
 from .config import get_settings
+
+TICK_SECONDS = 30
 
 _task: asyncio.Task | None = None
 
 
 async def _tick() -> None:
+    """Watched PRs: sync each one and re-review when its head moved."""
     conn = db.get_conn()
     rows = conn.execute(
         "SELECT id, head_sha, state FROM reviews WHERE watch = 1 AND archived = 0"
@@ -32,28 +37,33 @@ async def _tick() -> None:
         if not updated.get("head_changed"):
             continue
 
-        active = conn.execute(
-            "SELECT 1 FROM runs WHERE review_id=? AND status IN"
-            " ('queued','preparing','analyzing') LIMIT 1",
-            (review_id,),
-        ).fetchone()
-        if active:
+        if service.active_run(review_id):
             continue
 
+        try:
+            service.create_run(review_id, trigger="watch")
+        except service.BudgetExceeded as exc:
+            db.log_event(review_id, "", "watch_paused", str(exc))
+            continue
         db.log_event(review_id, "", "watch_trigger", f"head -> {updated['head_sha'][:8]}")
-        service.create_run(review_id, trigger="watch")
 
 
 async def _loop() -> None:
     interval = max(30, get_settings().watch_interval_seconds)
+    last_pr_tick = 0.0
     while True:
         try:
-            await _tick()
+            # Wakeups are cheap to check for (one indexed query), so they run
+            # every tick; the per-PR sync hits the forge, so it keeps its interval.
+            await watches.run_due()
+            if time.monotonic() - last_pr_tick >= interval:
+                last_pr_tick = time.monotonic()
+                await _tick()
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001
             pass
-        await asyncio.sleep(interval)
+        await asyncio.sleep(TICK_SECONDS)
 
 
 def start() -> None:

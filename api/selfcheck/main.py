@@ -11,10 +11,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, scheduler, service
+from . import db, scheduler, service, settings_store
 from .config import REPO_ROOT, get_settings
 from .providers.http import WriteAttemptBlocked
-from .routes import agent, reviews, runs, system
+from .routes import agent, analytics, reviews, runs, system, wakeups
+from .routes import settings as settings_routes  # `settings` is the config object below
 
 DESCRIPTION = """\
 selfcheck is a local, read-only review workbench for GitHub pull requests and
@@ -27,6 +28,11 @@ a non-URL, and the Claude process that reviews your code runs with `Write`,
 checkout. Review notes live in a local SQLite file; exporting them means copying
 markdown yourself.
 
+Reviews run on a choice of engine (Claude Code, Codex, Cursor Agent, the
+Anthropic API, or any OpenAI-compatible endpoint) at one of three depths
+(light, normal, thorough). Repository wakeups check a repo on a schedule and
+review new pull requests as they appear.
+
 See `GET /api/agent/guide` for how an agent should drive this API.
 """
 
@@ -36,6 +42,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     import asyncio
 
     db.init_db()
+    settings_store.init()
+    service.recover_interrupted_runs()
     service.bind_loop(asyncio.get_running_loop())
     scheduler.start()
     try:
@@ -72,6 +80,9 @@ def create_app() -> FastAPI:
     app.include_router(reviews.router)
     app.include_router(runs.router)
     app.include_router(agent.router)
+    app.include_router(wakeups.router)
+    app.include_router(analytics.router)
+    app.include_router(settings_routes.router)
 
     _mount_web(app)
     return app
@@ -101,7 +112,9 @@ def _mount_web(app: FastAPI) -> None:
         candidate = dist / full_path
         if full_path and candidate.is_file() and Path(candidate).resolve().is_relative_to(dist):
             return FileResponse(candidate)
-        return FileResponse(dist / "index.html")
+        # Always revalidate the page itself: it names the hashed asset files, so
+        # a cached copy keeps serving the previous UI after an update.
+        return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 app = create_app()

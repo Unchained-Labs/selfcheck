@@ -132,7 +132,95 @@ CREATE TABLE IF NOT EXISTS events (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, id);
+
+-- A repository selfcheck wakes up for on a schedule, to pick up new PRs/MRs.
+CREATE TABLE IF NOT EXISTS repo_watches (
+    id               TEXT PRIMARY KEY,
+    provider         TEXT NOT NULL,
+    host             TEXT NOT NULL,
+    namespace        TEXT NOT NULL,
+    project          TEXT NOT NULL,
+    url              TEXT NOT NULL,
+    enabled          INTEGER DEFAULT 1,
+    interval_minutes INTEGER DEFAULT 1440,
+    daily_at         TEXT DEFAULT '',         -- HH:MM server-local, daily cadence only
+    mode             TEXT DEFAULT '',         -- '' = the global default
+    engine           TEXT DEFAULT '',
+    include_drafts   INTEGER DEFAULT 0,
+    rereview_on_push INTEGER DEFAULT 0,
+    target_branch    TEXT DEFAULT '',         -- '' = any
+    authors          TEXT DEFAULT '',         -- comma-separated; '' = anyone
+    max_per_check    INTEGER DEFAULT 3,
+    baseline_at      TEXT DEFAULT '',         -- PRs opened before this are left alone
+    last_checked_at  TEXT DEFAULT '',
+    next_check_at    TEXT DEFAULT '',
+    last_result      TEXT DEFAULT '',
+    last_error       TEXT DEFAULT '',
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
+    UNIQUE (host, namespace, project)
+);
+
+-- A conversation about one finding: you ask, the engine answers from the checkout.
+CREATE TABLE IF NOT EXISTS note_messages (
+    id          TEXT PRIMARY KEY,
+    note_id     TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    review_id   TEXT NOT NULL,
+    role        TEXT NOT NULL,                 -- user | assistant
+    body        TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'done',  -- pending | done | failed
+    engine      TEXT DEFAULT '',
+    model       TEXT DEFAULT '',
+    cost_usd    REAL DEFAULT 0,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_note_messages ON note_messages(note_id, created_at);
+
+-- Instructions for every review in one repository, written in the app.
+CREATE TABLE IF NOT EXISTS repo_rules (
+    host        TEXT NOT NULL,
+    namespace   TEXT NOT NULL,
+    project     TEXT NOT NULL,
+    rules       TEXT NOT NULL DEFAULT '',
+    learn       INTEGER DEFAULT 1,             -- feed this repo's dismissals back in
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY (host, namespace, project)
+);
 """
+
+# Columns added after the first release. CREATE TABLE IF NOT EXISTS leaves an
+# existing table alone, so an older database gets these through ALTER TABLE.
+MIGRATIONS: dict[str, dict[str, str]] = {
+    "reviews": {
+        "mode": "TEXT DEFAULT ''",            # preferred mode for this PR; '' = default
+        "engine": "TEXT DEFAULT ''",
+        "repo_watch_id": "TEXT DEFAULT ''",   # set when a wakeup started tracking it
+        "assignees": "TEXT DEFAULT '[]'",
+        "reviewers": "TEXT DEFAULT '[]'",
+    },
+    "runs": {
+        "mode": "TEXT DEFAULT 'normal'",
+        "engine": "TEXT DEFAULT 'claude'",
+        # Findings this run raised, by severity. Kept on the run because a
+        # re-review replaces the notes themselves.
+        "note_counts": "TEXT DEFAULT ''",
+        # review | second_opinion. A second opinion never replaces the notes;
+        # its findings are kept here and compared against them.
+        "kind": "TEXT DEFAULT 'review'",
+        "findings": "TEXT DEFAULT ''",
+        # What went into the prompt beyond the diff: repo rules, learned
+        # dismissals. Shown on the summary so a review is explainable.
+        "context": "TEXT DEFAULT ''",
+    },
+}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    for table, columns in MIGRATIONS.items():
+        have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for name, ddl in columns.items():
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
 def _connect() -> sqlite3.Connection:
@@ -167,6 +255,7 @@ def init_db() -> None:
     conn = _connect()
     try:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         conn.commit()
     finally:
         conn.close()

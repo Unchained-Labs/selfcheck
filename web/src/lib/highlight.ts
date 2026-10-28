@@ -12,8 +12,9 @@ import type { BundledLanguage, BundledTheme, Highlighter, ThemedToken } from 'sh
 export type Line = ThemedToken[]
 
 const THEMES: Record<'light' | 'dark', BundledTheme> = {
-  light: 'github-light',
-  dark: 'github-dark-dimmed',
+  // Vitesse: low-contrast, teal-and-sage, and quiet next to the app palette.
+  light: 'vitesse-light',
+  dark: 'vitesse-dark',
 }
 
 const EXT_TO_LANG: Record<string, BundledLanguage> = {

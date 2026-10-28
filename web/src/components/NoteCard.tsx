@@ -4,6 +4,8 @@ import { renderMarkdown } from '../lib/markdown'
 import { noteLocation, noteToMarkdown } from '../lib/noteText'
 import type { Note, NoteStatus, Severity } from '../lib/types'
 import { CopyButton } from './CopyButton'
+import { Icon } from './Icon'
+import { NoteThread } from './NoteThread'
 
 const SEVERITIES: Severity[] = ['blocker', 'major', 'minor', 'nit', 'question', 'praise']
 
@@ -24,6 +26,7 @@ export function NoteCard({
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({ title: note.title, body: note.body })
+  const [asking, setAsking] = useState(false)
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true)
@@ -126,6 +129,8 @@ export function NoteCard({
         </div>
       )}
 
+      {asking && !editing && <NoteThread noteId={note.id} />}
+
       <div className="note-foot">
         {editing ? (
           <>
@@ -178,6 +183,13 @@ export function NoteCard({
                 Reopen
               </button>
             )}
+            <button
+              className={`btn ghost sm ${asking ? 'on' : ''}`}
+              onClick={() => setAsking((a) => !a)}
+              title="Ask the engine a follow-up question about this finding"
+            >
+              <Icon name="note" size={12} /> Ask
+            </button>
             <button className="btn ghost sm" onClick={() => setEditing(true)}>Edit</button>
             <span className="spacer" />
             {!!note.stale && note.status === 'open' && (

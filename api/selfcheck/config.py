@@ -27,9 +27,41 @@ class Settings(BaseSettings):
     gitlab_token: str = Field(default="", alias="GITLAB_TOKEN")
     host_tokens_raw: str = Field(default="", alias="SELFCHECK_HOST_TOKENS")
 
+    # Which engine reviews when a run does not ask for one: claude | codex |
+    # cursor | anthropic | openai. See engines/ for what each one is.
+    engine: str = Field(default="claude", alias="SELFCHECK_ENGINE")
+    # light | normal | thorough
+    default_mode: str = Field(default="normal", alias="SELFCHECK_DEFAULT_MODE")
+
     claude_bin: str = Field(default="claude", alias="SELFCHECK_CLAUDE_BIN")
     claude_model: str = Field(default="", alias="SELFCHECK_CLAUDE_MODEL")
+    codex_bin: str = Field(default="codex", alias="SELFCHECK_CODEX_BIN")
+    codex_model: str = Field(default="", alias="SELFCHECK_CODEX_MODEL")
+    cursor_bin: str = Field(default="cursor-agent", alias="SELFCHECK_CURSOR_BIN")
+    cursor_model: str = Field(default="", alias="SELFCHECK_CURSOR_MODEL")
+
+    # API engines. Read from .env as well as the environment, so they are
+    # passed to the client explicitly rather than relied on via os.environ.
+    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
+    anthropic_model: str = Field(default="claude-opus-5-5", alias="SELFCHECK_ANTHROPIC_MODEL")
+    openai_base_url: str = Field(
+        default="https://api.openai.com/v1", alias="SELFCHECK_OPENAI_BASE_URL"
+    )
+    openai_api_key: str = Field(default="", alias="SELFCHECK_OPENAI_API_KEY")
+    openai_api_key_fallback: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="", alias="SELFCHECK_OPENAI_MODEL")
+
     run_timeout_seconds: int = Field(default=900, alias="SELFCHECK_RUN_TIMEOUT_SECONDS")
+    # Reviews running at once. A repo wakeup can find several new PRs in one
+    # check; the rest wait their turn rather than all spending at the same time.
+    max_concurrent_runs: int = Field(default=2, alias="SELFCHECK_MAX_CONCURRENT_RUNS")
+
+    # Feed findings you dismissed in a repository back into its next reviews.
+    learn_from_dismissals: bool = Field(default=True, alias="SELFCHECK_LEARN_FROM_DISMISSALS")
+    # Spend caps in USD; 0 means no cap. Automatic reviews (wakeups, watches)
+    # stop once a cap is reached; a review you start by hand still runs.
+    daily_budget_usd: float = Field(default=0.0, alias="SELFCHECK_DAILY_BUDGET_USD")
+    monthly_budget_usd: float = Field(default=0.0, alias="SELFCHECK_MONTHLY_BUDGET_USD")
 
     clone_enabled: bool = Field(default=True, alias="SELFCHECK_CLONE_ENABLED")
     cache_max_gb: float = Field(default=10.0, alias="SELFCHECK_CACHE_MAX_GB")
@@ -63,6 +95,10 @@ class Settings(BaseSettings):
 
     def token_for(self, host: str) -> str:
         return self.host_tokens.get(host.lower(), "")
+
+    @property
+    def openai_key(self) -> str:
+        return self.openai_api_key or self.openai_api_key_fallback
 
     @property
     def db_path(self) -> Path:

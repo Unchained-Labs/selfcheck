@@ -7,9 +7,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
-from .. import exporting, service
+from .. import exporting, service, workspace
 from ..models import AddReview, FileViewed, ReviewFlags
 from ..providers import UnsupportedUrl
+from ..providers.local import looks_local
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -19,11 +20,17 @@ def list_reviews(include_archived: bool = False) -> dict[str, Any]:
     return {"reviews": service.list_reviews(include_archived)}
 
 
-@router.post("", status_code=201, summary="Track a PR/MR by URL")
+@router.post("", status_code=201,
+             summary="Track a PR/MR by URL, or a local branch by path (~/src/app@feature..main)")
 async def add_review(body: AddReview) -> dict[str, Any]:
     try:
-        review = service.create_or_get_review(body.url)
+        if looks_local(body.url):
+            review = await service.create_local_review(body.url)
+        else:
+            review = service.create_or_get_review(body.url)
     except UnsupportedUrl as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except workspace.GitError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
@@ -39,7 +46,7 @@ async def add_review(body: AddReview) -> dict[str, Any]:
 
     run = None
     if body.review_now:
-        run = service.create_run(review["id"], trigger="api")
+        run = service.create_run(review["id"], trigger="api", mode=body.mode, engine=body.engine)
     return {"review": review, "run": run}
 
 
@@ -68,12 +75,15 @@ def delete_review(review_id: str) -> dict[str, Any]:
     return {"deleted": review_id}
 
 
-@router.patch("/{review_id}/flags", summary="Toggle watch / pinned / archived")
+@router.patch("/{review_id}/flags",
+              summary="Toggle watch / pinned / archived, or set this PR's default mode and engine")
 def patch_flags(review_id: str, body: ReviewFlags) -> dict[str, Any]:
     try:
         return {"review": service.set_flags(review_id, **body.model_dump(exclude_none=True))}
     except service.NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/{review_id}/sync", summary="Refetch metadata; reports whether the head moved")

@@ -1,22 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
+import { MODE_LABEL } from '../lib/labels'
 import type { Run, RunEvent } from '../lib/types'
+import { Icon, Spinner } from './Icon'
 
-const PHASE_LABEL: Record<string, string> = {
-  queued: 'Queued',
-  sync: 'Fetching pull request metadata',
-  diff: 'Fetching the diff',
-  clone: 'Preparing the read-only checkout',
-  analyzing: 'Claude is reading the change',
-  done: 'Done',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-}
+const STEPS: { id: string; label: string }[] = [
+  { id: 'sync', label: 'Metadata' },
+  { id: 'diff', label: 'Diff' },
+  { id: 'clone', label: 'Checkout' },
+  { id: 'analyzing', label: 'Reading' },
+]
 
 /** Live progress for an in-flight run, fed by the server's SSE stream. */
-export function RunBar({ run, onFinished }: { run: Run; onFinished: () => void }) {
+export function RunBar({
+  run, engineName, onFinished,
+}: {
+  run: Run
+  engineName: string
+  onFinished: () => void
+}) {
   const [events, setEvents] = useState<RunEvent[]>([])
   const [phase, setPhase] = useState(run.phase || run.status)
+  const [message, setMessage] = useState(run.progress)
   const logRef = useRef<HTMLDivElement>(null)
   const finishedRef = useRef(false)
 
@@ -32,6 +37,7 @@ export function RunBar({ run, onFinished }: { run: Run; onFinished: () => void }
         return
       }
       if (ev.phase) setPhase(ev.phase)
+      if (ev.kind === 'phase' && ev.message) setMessage(ev.message)
       setEvents((prev) => [...prev.slice(-80), ev])
       if (ev.kind === 'done' || ev.kind === 'failed' || ev.kind === 'cancelled') {
         if (!finishedRef.current) {
@@ -63,23 +69,39 @@ export function RunBar({ run, onFinished }: { run: Run; onFinished: () => void }
 
   const tools = events.filter((e) => e.kind === 'tool')
   const warns = events.filter((e) => e.kind === 'warn')
+  const current = STEPS.findIndex((s) => s.id === phase)
+  const queued = phase === 'queued'
 
   return (
     <div className="runbar">
-      <div className="row">
-        <span className="spin">◴</span>
-        <strong>{PHASE_LABEL[phase] ?? phase}</strong>
-        {tools.length > 0 && (
-          <span className="faint">· {tools.length} file lookups</span>
-        )}
+      <div className="runbar-top">
+        <Spinner size={15} />
+        <strong>{queued ? 'Queued' : message || 'Working'}</strong>
+        <span className="chip"><Icon name="cpu" size={12} /> {engineName}</span>
+        <span className="chip"><Icon name="gauge" size={12} /> {MODE_LABEL[run.mode] ?? run.mode}</span>
+        {tools.length > 0 && <span className="faint">{tools.length} file lookups</span>}
         <span className="spacer" />
         <button className="btn ghost sm" onClick={() => void api.cancelRun(run.id).then(onFinished)}>
-          Cancel
+          <Icon name="x" size={13} /> Cancel
         </button>
       </div>
-      <div className="bar"><i /></div>
+
+      <ol className="steps" aria-label="Progress">
+        {STEPS.map((s, i) => {
+          const state = queued || current < i ? 'todo' : current === i ? 'now' : 'done'
+          return (
+            <li key={s.id} className={`step ${state}`}>
+              <span className="step-mark">
+                {state === 'done' ? <Icon name="check" size={11} /> : state === 'now' ? <span className="pulse" /> : null}
+              </span>
+              {s.label}
+            </li>
+          )
+        })}
+      </ol>
+
       {warns.map((w, i) => (
-        <div key={i} className="banner warn" style={{ border: 0, padding: '2px 0' }}>{w.message}</div>
+        <div key={i} className="run-warn"><Icon name="alert" size={13} /> {w.message}</div>
       ))}
       {tools.length > 0 && (
         <div className="runlog" ref={logRef}>

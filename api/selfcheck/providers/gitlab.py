@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import quote
 
 from ..config import get_settings
-from .base import PullMeta, PullRef
+from .base import PullMeta, PullRef, PullSummary, RepoRef
 from .http import ReadOnlyClient
 
 
@@ -97,6 +97,8 @@ class GitLabProvider:
             web_url=mr.get("web_url") or "",
             commits=commits,
             labels=list(mr.get("labels") or []),
+            assignees=[u.get("username", "") for u in (mr.get("assignees") or []) if u],
+            reviewers=[u.get("username", "") for u in (mr.get("reviewers") or []) if u],
         )
 
     async def fetch_diff(self, ref: PullRef, meta: PullMeta) -> str:
@@ -130,6 +132,28 @@ class GitLabProvider:
             header.append(f"+++ {b}")
             chunks.append("\n".join(header) + "\n" + (body if body.endswith("\n") else body + "\n"))
         return "".join(chunks)
+
+    async def list_open_pulls(self, repo: RepoRef, limit: int = 50) -> list[PullSummary]:
+        proj = quote(repo.full_path, safe="")
+        mrs = await self._client.get_json(
+            f"/projects/{proj}/merge_requests",
+            params={"state": "opened", "order_by": "created_at", "sort": "desc",
+                    "per_page": min(limit, 100)},
+        )
+        return [
+            PullSummary(
+                number=int(m["iid"]),
+                title=m.get("title") or "",
+                author=((m.get("author") or {}).get("username")) or "",
+                draft=bool(m.get("draft") or m.get("work_in_progress")),
+                base_ref=m.get("target_branch") or "",
+                head_sha=m.get("sha") or "",
+                created_at=m.get("created_at") or "",
+                updated_at=m.get("updated_at") or "",
+                web_url=m.get("web_url") or repo.pull_url(int(m["iid"])),
+            )
+            for m in mrs
+        ]
 
     def authenticated_clone_url(self, host: str, clone_url: str) -> str:
         if not clone_url or not self._token:

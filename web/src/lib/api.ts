@@ -1,6 +1,11 @@
 import type {
-  DiffPayload, Note, NoteStatus, Review, ReviewDetail, Run, Severity, Status,
+  CheckResult, Comparison, DiffPayload, NoteMessage, RepoRules, EngineId, Mode, Note, NoteStatus, OpenPull, Review, ReviewDetail,
+  Run, SettingsSnapshot, SettingsValues, Severity, Status, Wakeup, WakeupSettings,
 } from './types'
+
+import type { AnalyticsData } from './analytics'
+
+export interface RunOptions { mode?: Mode; engine?: EngineId; guidance?: string }
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -33,14 +38,23 @@ export const api = {
 
   listReviews: () => req<{ reviews: Review[] }>('/api/reviews').then((r) => r.reviews),
 
-  addReview: (url: string, opts: { watch?: boolean; review_now?: boolean } = {}) =>
+  addReview: (
+    url: string,
+    opts: { watch?: boolean; review_now?: boolean; mode?: Mode; engine?: EngineId } = {},
+  ) =>
     req<{ review: Review; run: Run | null }>('/api/reviews', body({ url, ...opts })),
 
   getReview: (id: string) => req<ReviewDetail>(`/api/reviews/${id}`),
 
   deleteReview: (id: string) => req<{ deleted: string }>(`/api/reviews/${id}`, { method: 'DELETE' }),
 
-  setFlags: (id: string, flags: { watch?: boolean; pinned?: boolean; archived?: boolean }) =>
+  setFlags: (
+    id: string,
+    flags: {
+      watch?: boolean; pinned?: boolean; archived?: boolean
+      mode?: Mode | ''; engine?: EngineId | ''
+    },
+  ) =>
     req<{ review: Review }>(`/api/reviews/${id}/flags`, {
       method: 'PATCH', body: JSON.stringify(flags), headers: { 'content-type': 'application/json' },
     }),
@@ -60,8 +74,8 @@ export const api = {
       body({ path, viewed }),
     ),
 
-  startRun: (id: string, guidance = '') =>
-    req<{ run: Run }>(`/api/reviews/${id}/runs`, body({ guidance, trigger: 'manual' })),
+  startRun: (id: string, opts: RunOptions = {}) =>
+    req<{ run: Run }>(`/api/reviews/${id}/runs`, body({ trigger: 'manual', ...opts })),
 
   cancelRun: (runId: string) => req<{ run: Run }>(`/api/runs/${runId}/cancel`, { method: 'POST' }),
 
@@ -93,6 +107,60 @@ export const api = {
 
   exportMarkdown: (id: string, includeResolved = false) =>
     req<string>(api.exportUrl(id, includeResolved)),
+
+  analytics: () => req<AnalyticsData>('/api/analytics'),
+
+  settings: () => req<SettingsSnapshot>('/api/settings'),
+
+  /** A null value resets that setting to its .env default. */
+  updateSettings: (changes: Partial<Record<keyof SettingsValues, unknown>>) =>
+    req<SettingsSnapshot>('/api/settings', {
+      method: 'PATCH', body: JSON.stringify(changes), headers: { 'content-type': 'application/json' },
+    }),
+
+  secondOpinion: (id: string, opts: { engine?: EngineId; mode?: Mode } = {}) =>
+    req<{ run: Run }>(`/api/reviews/${id}/second-opinion`, body(opts)),
+
+  compare: (id: string) => req<Comparison>(`/api/reviews/${id}/compare`),
+
+  noteMessages: (noteId: string) =>
+    req<{ messages: NoteMessage[] }>(`/api/notes/${noteId}/messages`).then((r) => r.messages),
+
+  askNote: (noteId: string, question: string, engine?: EngineId) =>
+    req<{ messages: NoteMessage[] }>(`/api/notes/${noteId}/ask`, body({ question, engine }))
+      .then((r) => r.messages),
+
+  repoRules: (repo: string) =>
+    req<{ rules: RepoRules }>(`/api/repo-rules?repo=${encodeURIComponent(repo)}`).then((r) => r.rules),
+
+  allRepoRules: () => req<{ rules: RepoRules[] }>('/api/repo-rules').then((r) => r.rules),
+
+  saveRepoRules: (repo: string, change: { rules?: string; learn?: boolean }) =>
+    req<{ rules: RepoRules }>('/api/repo-rules', {
+      method: 'PUT', body: JSON.stringify({ repo, ...change }), headers: { 'content-type': 'application/json' },
+    }).then((r) => r.rules),
+
+  engineModels: (id: string) =>
+    req<{ models: string[]; error: string | null }>(`/api/engines/${id}/models`),
+
+  listWakeups: () => req<{ wakeups: Wakeup[] }>('/api/wakeups').then((r) => r.wakeups),
+
+  addWakeup: (
+    url: string,
+    settings: WakeupSettings & { include_existing?: boolean; provider?: string } = {},
+  ) => req<{ wakeup: Wakeup }>('/api/wakeups', body({ url, ...settings })),
+
+  updateWakeup: (id: string, settings: WakeupSettings) =>
+    req<{ wakeup: Wakeup }>(`/api/wakeups/${id}`, {
+      method: 'PATCH', body: JSON.stringify(settings), headers: { 'content-type': 'application/json' },
+    }),
+
+  deleteWakeup: (id: string) => req<{ deleted: string }>(`/api/wakeups/${id}`, { method: 'DELETE' }),
+
+  checkWakeup: (id: string) => req<CheckResult>(`/api/wakeups/${id}/check`, { method: 'POST' }),
+
+  wakeupPulls: (id: string) =>
+    req<{ pulls: OpenPull[] }>(`/api/wakeups/${id}/pulls`).then((r) => r.pulls),
 }
 
 export { ApiError }

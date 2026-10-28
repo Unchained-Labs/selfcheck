@@ -96,7 +96,10 @@ GET    /api/reviews/{{id}}/export.md       notes as markdown for the user to pas
 PATCH  /api/notes/{{note_id}}              status / severity / text
 DELETE /api/notes/{{note_id}}              remove a note
 POST   /api/reviews/{{id}}/runs            run the built-in reviewer instead of doing it yourself
-GET    /api/status                        Claude CLI, tokens, cache health
+                                          {{"mode": "light|normal|thorough",
+                                            "engine": "claude|codex|cursor|anthropic|openai"}}
+GET    /api/wakeups                       repositories selfcheck checks on a schedule
+GET    /api/status                        engines, tokens, cache health
 """
 
 
@@ -228,9 +231,9 @@ def put_summary(review_id: str, body: SummaryIn) -> dict[str, Any]:
         with db.tx() as c:
             c.execute(
                 "INSERT INTO runs (id, review_id, status, trigger, phase, base_sha, head_sha,"
-                " created_at) VALUES (?,?,?,?,?,?,?,?)",
+                " engine, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
                 (run_id, review_id, "done", "api", "done", review["base_sha"],
-                 review["head_sha"], db.now()),
+                 review["head_sha"], "agent", db.now()),
             )
 
     with db.tx() as c:

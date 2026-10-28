@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { copyText } from '../lib/clipboard'
+import { Icon } from './Icon'
 
 type State = 'idle' | 'ok' | 'failed'
 
@@ -41,7 +42,7 @@ export function CopyButton({
         : (title ?? label)}
       aria-live="polite"
     >
-      <span aria-hidden="true">{state === 'ok' ? '✓' : '⧉'}</span>
+      <Icon name={state === 'ok' ? 'check' : state === 'failed' ? 'alert' : 'copy'} size={13} />
       {!compact && <span>{shown}</span>}
     </button>
   )
