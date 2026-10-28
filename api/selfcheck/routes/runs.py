@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from .. import service
 from ..events import bus
-from ..models import NotePatch, NotesIn, StartRun
+from ..models import AskNote, NotePatch, NotesIn, SecondOpinion, StartRun
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
@@ -53,14 +53,39 @@ def list_runs(review_id: str) -> dict[str, Any]:
 
 
 @router.post("/reviews/{review_id}/runs", status_code=202,
-             summary="Ask Claude to review (or re-review) this PR")
+             summary="Review (or re-review) this PR, optionally choosing depth and engine")
 async def start_run(review_id: str, body: StartRun | None = None) -> dict[str, Any]:
     body = body or StartRun()
     try:
-        run = service.create_run(review_id, trigger=body.trigger, guidance=body.guidance)
+        run = service.create_run(
+            review_id, trigger=body.trigger, guidance=body.guidance,
+            mode=body.mode, engine=body.engine,
+        )
     except service.NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"run": run}
+
+
+@router.post("/reviews/{review_id}/second-opinion", status_code=202,
+             summary="Have another engine review the same PR, without replacing the notes")
+async def second_opinion(review_id: str, body: SecondOpinion | None = None) -> dict[str, Any]:
+    body = body or SecondOpinion()
+    try:
+        run = service.create_run(review_id, trigger="manual", mode=body.mode,
+                                 engine=body.engine, kind="second_opinion")
+    except service.NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"run": run}
+
+
+@router.get("/reviews/{review_id}/compare",
+            summary="Where the latest second opinion agrees with the review, and where not")
+def compare(review_id: str, run_id: str | None = None) -> dict[str, Any]:
+    try:
+        service.get_review(review_id)
+        return service.compare_opinion(review_id, run_id)
+    except service.NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/runs/{run_id}", summary="Run status and results")
@@ -130,6 +155,22 @@ def add_notes(review_id: str, body: NotesIn) -> dict[str, Any]:
 def patch_note(note_id: str, body: NotePatch) -> dict[str, Any]:
     try:
         return {"note": service.update_note(note_id, body.model_dump(exclude_none=True))}
+    except service.NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/notes/{note_id}/messages", summary="The conversation about one finding")
+def note_messages(note_id: str) -> dict[str, Any]:
+    return {"messages": service.list_messages(note_id)}
+
+
+@router.post("/notes/{note_id}/ask", status_code=202,
+             summary="Ask a follow-up question about a finding; the engine answers from the checkout")
+def ask(note_id: str, body: AskNote) -> dict[str, Any]:
+    try:
+        return {"messages": service.ask_about_note(note_id, body.question, body.engine)}
     except service.NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

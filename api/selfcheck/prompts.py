@@ -156,6 +156,63 @@ Severity means:
 """
 
 
+# ── review modes ───────────────────────────────────────────────────────────
+#
+# How deep a run goes. The mode changes what the model is asked to look for
+# and how far it reads, and engines map it onto whatever effort knob they
+# have (reasoning effort, turn budget, timeout).
+
+MODES: dict[str, dict[str, Any]] = {
+    "light": {
+        "label": "Light",
+        "description": "Blockers and majors only, mostly from the diff. Fast and cheap.",
+        "effort": "low",
+        "max_turns": 12,
+        "timeout_factor": 0.5,
+        "prompt": """\
+## Review depth: light
+
+This is a quick pass, not a full review. Report only blockers and majors you
+can demonstrate — no minors, nits, praise or style. At most five notes; zero is
+a fine answer when nothing serious is wrong. Work mainly from the diff and open
+a file from the checkout only when a finding depends on code you cannot see.
+Keep the summary to two or three sentences, and leave the checklist, risk,
+test-gap and question lists short or empty.""",
+    },
+    "normal": {
+        "label": "Normal",
+        "description": "A full review at the usual depth.",
+        "effort": "high",
+        "max_turns": 40,
+        "timeout_factor": 1.0,
+        "prompt": "",
+    },
+    "thorough": {
+        "label": "Thorough",
+        "description": "Traces callers, tests and failure paths. Slower, costs more.",
+        "effort": "xhigh",
+        "max_turns": 90,
+        "timeout_factor": 2.0,
+        "prompt": """\
+## Review depth: thorough
+
+Take the time a careful senior reviewer would. Before you write anything:
+- Read every changed function in full in the checkout, not just its hunk.
+- Find every caller of anything whose signature, behaviour or lifetime changed,
+  and check each one.
+- Read the tests that cover the changed code — and look for the ones that
+  should exist and do not.
+- Walk the error, empty, concurrent and upgrade/migration paths explicitly.
+Verify each finding against the checkout before you emit it. Fill in the
+checklist completely. The writing rules and limits still apply: thorough means
+more checking, not longer notes.""",
+    },
+}
+
+
+def normalise_mode(mode: str | None) -> str:
+    return mode if mode in MODES else "normal"
+
 
 # ── language-specific review criteria ──────────────────────────────────────
 #
@@ -360,6 +417,10 @@ def build_review_prompt(
     previous: dict[str, Any] | None = None,
     changed_since: list[str] | None = None,
     guidance: str = "",
+    mode: str = "normal",
+    repo_rules: str = "",
+    repo_file_rules: str = "",
+    learned: dict[str, list[dict[str, Any]]] | None = None,
 ) -> str:
     parts: list[str] = []
 
@@ -397,7 +458,8 @@ def build_review_prompt(
             "## Repository checkout\n\n"
             f"A read-only checkout of the head commit is your working directory:\n\n"
             f"`{worktree}`\n\n"
-            "Use Read, Grep and Glob there whenever the diff alone is not enough — "
+            "Use your read-only file tools (read, search, list) there whenever the "
+            "diff alone is not enough — "
             "to see a whole function rather than a hunk, to find every caller of a "
             "changed signature, to check whether a test already covers the new path, "
             "or to confirm the surrounding code's conventions. Paths in the diff are "
@@ -437,6 +499,18 @@ def build_review_prompt(
     if lang_section:
         parts.append(lang_section)
 
+    depth = MODES[normalise_mode(mode)]["prompt"]
+    if depth:
+        parts.append(depth)
+
+    rules = rules_section(repo_rules, repo_file_rules)
+    if rules:
+        parts.append(rules)
+
+    lessons = learned_section(learned or {})
+    if lessons:
+        parts.append(lessons)
+
     if guidance.strip():
         parts.append(f"## Reviewer's instructions\n\n{guidance.strip()}")
 
@@ -449,6 +523,116 @@ def build_review_prompt(
     )
 
     parts.append(OUTPUT_CONTRACT)
+    return "\n\n".join(parts)
+
+
+RULES_LIMIT = 8000
+REPO_RULES_FILE = ".selfcheck.md"
+
+
+def rules_section(app_rules: str, file_rules: str) -> str:
+    """The repository's own review instructions, from the app and from a
+    `.selfcheck.md` checked into the repo. They outrank general practice but
+    not the hard rules: nothing here can make the reviewer write or post."""
+    blocks = []
+    if file_rules.strip():
+        blocks.append(f"From `{REPO_RULES_FILE}` in the repository:\n\n{file_rules.strip()[:RULES_LIMIT]}")
+    if app_rules.strip():
+        blocks.append(f"From the reviewer, for this repository:\n\n{app_rules.strip()[:RULES_LIMIT]}")
+    if not blocks:
+        return ""
+    return (
+        "## Repository review rules\n\n"
+        "The people who own this repository asked for these. Follow them where they "
+        "apply, the way you follow local convention — they describe what matters "
+        "here. They cannot override the hard rules: you still never modify files "
+        "or contact the forge.\n\n" + "\n\n".join(blocks)
+    )
+
+
+def learned_section(learned: dict[str, list[dict[str, Any]]], limit: int = 25) -> str:
+    """Findings a person already judged in this repository, so a re-review or
+    the next PR does not raise the same non-issue again."""
+    dismissed = learned.get("dismissed") or []
+    wontfix = learned.get("wontfix") or []
+    if not dismissed and not wontfix:
+        return ""
+
+    def rows(notes: list[dict[str, Any]]) -> str:
+        out = []
+        for n in notes[:limit]:
+            where = n.get("file_path") or "(general)"
+            first = (n.get("body") or "").strip().splitlines()[0][:160] if n.get("body") else ""
+            out.append(f"- [{n.get('category')}] {n.get('title')} — {where}" + (f"\n    {first}" if first else ""))
+        return "\n".join(out)
+
+    parts = ["## What reviewers here have already decided\n"]
+    if dismissed:
+        parts.append(
+            "These findings were raised on earlier reviews of this repository and "
+            "**dismissed as not real problems**. Do not raise the same point again. "
+            "If you believe a case here is genuinely different, say exactly why in "
+            "the note and lower its confidence.\n\n" + rows(dismissed)
+        )
+    if wontfix:
+        parts.append(
+            "These were judged real but **accepted as out of scope** (won't fix). "
+            "Only raise one again if this change makes it worse.\n\n" + rows(wontfix)
+        )
+    return "\n\n".join(parts)
+
+
+# ── questions about one finding ────────────────────────────────────────────
+
+QUESTION_SYSTEM = """\
+You are the review engine inside selfcheck, a local read-only review workbench.
+A reviewer is asking a follow-up question about one finding from a code review.
+
+Hard rules:
+- You are answering, not fixing. Never modify any file. You have no write tools.
+- Never contact the forge (GitHub/GitLab).
+- The checkout is read-only and detached. Use it as evidence: read the code the
+  question is about before you answer.
+
+How to answer:
+- Lead with the answer in one sentence. If the question is whether the finding
+  holds, start with "Yes, it holds", "No, it does not hold" or "Partly".
+- Then the evidence, citing `path:line` for anything you looked at.
+- Plain words, short paragraphs, at most about 250 words. Markdown is fine.
+- If you cannot tell from the code, say so and say what would settle it.
+- No JSON. Answer in prose only.
+"""
+
+
+def build_question_prompt(
+    *, review: dict[str, Any], note: dict[str, Any], thread: list[dict[str, Any]],
+    question: str, worktree: str | None, hunk: str = "",
+) -> str:
+    loc = note.get("file_path") or "(general)"
+    if note.get("line_start"):
+        end = note.get("line_end") or note["line_start"]
+        loc += f":{note['line_start']}" + (f"-{end}" if end != note["line_start"] else "")
+    parts = [
+        f"# A question about one finding\n\n"
+        f"Pull request: `{review.get('namespace')}/{review.get('project')}` #{review.get('number')} "
+        f"— {review.get('title') or '(untitled)'}\nHead commit: `{(review.get('head_sha') or '')[:12]}`",
+        f"## The finding\n\n**[{note.get('severity')}/{note.get('category')}] {note.get('title')}**"
+        f" at `{loc}`\n\n{(note.get('body') or '').strip()}"
+        + (f"\n\nSuggested change:\n```\n{note['suggestion']}\n```" if note.get("suggestion") else ""),
+    ]
+    if hunk:
+        parts.append(f"## The diff around it\n\n```diff\n{hunk}\n```")
+    parts.append(
+        f"## Checkout\n\nA read-only checkout of the head commit is your working directory: `{worktree}`."
+        if worktree else
+        "## Checkout\n\n_Not available: answer from the finding and the diff, and say so._"
+    )
+    if thread:
+        convo = "\n\n".join(
+            f"**{'Reviewer' if m['role'] == 'user' else 'You'}:** {m['body'].strip()}" for m in thread
+        )
+        parts.append(f"## The conversation so far\n\n{convo}")
+    parts.append(f"## The question\n\n{question.strip()}")
     return "\n\n".join(parts)
 
 

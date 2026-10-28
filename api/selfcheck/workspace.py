@@ -150,6 +150,11 @@ def _fetch_refspecs(ref: PullRef, meta: PullMeta) -> list[str]:
     """
     n = ref.number
     specs: list[str] = []
+    if ref.provider == "local":
+        # The source is a repository on this machine: take its branches and
+        # remote-tracking refs, then check out the head by commit.
+        return ["+refs/heads/*:refs/selfcheck/local/heads/*",
+                "+refs/remotes/*:refs/selfcheck/local/remotes/*"]
     if ref.provider == "github":
         specs.append(f"+refs/pull/{n}/head:refs/selfcheck/{n}/head")
     else:
@@ -176,11 +181,11 @@ async def ensure_mirror(ref: PullRef, meta: PullMeta, token: str) -> Path:
     await git(["config", "remote.origin.pushurl", "selfcheck://read-only"], mirror)
     await git(["config", "gc.auto", "0"], mirror)
 
+    # A partial clone needs a server that supports filters; a local path is
+    # cheap to fetch in full anyway.
+    partial = [] if ref.provider == "local" else ["--filter=blob:none"]
     await git(
-        [
-            "fetch", "--no-tags", "--prune", "--quiet",
-            "--filter=blob:none", "origin", *_fetch_refspecs(ref, meta),
-        ],
+        ["fetch", "--no-tags", "--prune", "--quiet", *partial, "origin", *_fetch_refspecs(ref, meta)],
         mirror,
         token=token,
     )
