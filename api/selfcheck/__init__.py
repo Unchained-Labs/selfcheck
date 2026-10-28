@@ -1,4 +1,4 @@
 """selfcheck — a local, read-only review workbench for pull requests, merge requests
 and local branches."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
