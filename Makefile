@@ -69,7 +69,10 @@ typecheck: ## Typecheck the web app
 	@source scripts/_node.sh && cd web && pnpm typecheck
 
 .PHONY: check
-check: test typecheck ## Everything that does not need a running server
+lint: ## Lint the API (ruff), as CI does
+	cd api && uvx ruff@0.17.3 check selfcheck tests
+
+check: lint test typecheck ## Everything that does not need a running server
 
 ## Claude integration
 .PHONY: skill

@@ -12,8 +12,8 @@ from .base import (
 )
 from .github import GitHubProvider
 from .gitlab import GitLabProvider
-from .local import LocalProvider
 from .http import WriteAttemptBlocked
+from .local import LocalProvider
 
 __all__ = [
     "Provider",

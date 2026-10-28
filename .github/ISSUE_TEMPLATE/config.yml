@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/Unchained-Labs/selfcheck/security/advisories/new
+    about: Report a way around the read-only promise privately.

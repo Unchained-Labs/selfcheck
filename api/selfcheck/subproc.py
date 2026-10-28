@@ -115,7 +115,7 @@ async def run_cli(
             asyncio.gather(pump_stdout(), pump_stderr(), proc.wait()),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await terminate(proc)
         outcome.error = f"{label} run exceeded {timeout}s and was killed"
     except asyncio.CancelledError:
@@ -146,7 +146,7 @@ async def terminate(proc: asyncio.subprocess.Process) -> None:
         return
     try:
         await asyncio.wait_for(proc.wait(), timeout=5)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
+    except (TimeoutError, asyncio.CancelledError):
         try:
             proc.kill()
         except ProcessLookupError:

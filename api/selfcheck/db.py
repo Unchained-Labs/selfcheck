@@ -8,7 +8,7 @@ import threading
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from .config import get_settings
@@ -264,7 +264,7 @@ def init_db() -> None:
 # ── helpers ───────────────────────────────────────────────────────────────
 
 def now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def new_id(prefix: str) -> str:

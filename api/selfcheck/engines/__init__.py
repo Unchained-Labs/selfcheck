@@ -54,7 +54,7 @@ async def describe_engines() -> list[dict[str, Any]]:
     engines = [get_engine(e) for e in ENGINE_IDS]
     probes = await asyncio.gather(*(e.probe() for e in engines), return_exceptions=True)
     out = []
-    for engine, probe in zip(engines, probes):
+    for engine, probe in zip(engines, probes, strict=True):
         if isinstance(probe, BaseException):
             probe = {"available": False, "error": f"{type(probe).__name__}: {probe}"}
         out.append({

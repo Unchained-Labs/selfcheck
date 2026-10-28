@@ -5,15 +5,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from . import db, prompts, workspace
 from .config import get_settings
+from .diffparse import parse_unified_diff, render_for_prompt, to_payload
 from .engines import ENGINE_IDS, ReviewTask, UnknownEngine, get_engine
 from .engines.base import noop_event
-from .diffparse import parse_unified_diff, render_for_prompt, to_payload
 from .events import bus
 from .providers import PullRef, get_provider, parse_pull_url
 from .providers.base import PullMeta
@@ -693,8 +693,8 @@ async def _review(run_id: str, run: dict[str, Any], guidance: str) -> None:
                 new_count=h["new_count"],
             )
             hunk.lines = [
-                DiffLine(l["kind"], l["content"], l["old_line"], l["new_line"])
-                for l in h["lines"]
+                DiffLine(ln["kind"], ln["content"], ln["old_line"], ln["new_line"])
+                for ln in h["lines"]
             ]
             df.hunks.append(hunk)
         rehydrated.append(df)
@@ -1110,7 +1110,7 @@ class BudgetExceeded(RuntimeError):
 
 
 def _spend_since(start: datetime) -> float:
-    iso = start.astimezone(timezone.utc).isoformat(timespec="seconds")
+    iso = start.astimezone(UTC).isoformat(timespec="seconds")
     conn = db.get_conn()
     runs = conn.execute("SELECT COALESCE(SUM(cost_usd), 0) FROM runs WHERE created_at >= ?",
                         (iso,)).fetchone()[0]

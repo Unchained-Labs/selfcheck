@@ -1,0 +1,46 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **If it is a way to make selfcheck write to a forge or outside its checkout, please use a [private security advisory](https://github.com/Unchained-Labs/selfcheck/security/advisories/new) instead.**
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      placeholder: |
+        1. Add https://github.com/…/pull/…
+        2. Review with Codex, light
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release tag, or `version` from `GET /api/status`.
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Review engine
+      options: [Claude Code, Codex, Cursor Agent, Anthropic API, OpenAI-compatible API, not engine-related]
+  - type: dropdown
+    id: forge
+    attributes:
+      label: Forge
+      options: [GitHub, GitHub Enterprise, GitLab.com, self-managed GitLab, local branch, not forge-related]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove tokens and private code first.
+      render: text
