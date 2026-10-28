@@ -1,0 +1,64 @@
+# Changelog
+
+All notable changes to selfcheck are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
+[Semantic Versioning](https://semver.org/). Every pull request merged into
+`main` releases a new version (see [CONTRIBUTING.md](CONTRIBUTING.md#releases));
+add your change under **Unreleased** in the same pull request.
+
+## [Unreleased]
+
+### Added
+
+- **Review engines.** Reviews run on Claude Code, Codex, Cursor Agent, the
+  Anthropic API or any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM,
+  OpenRouter), chosen per run, per pull request, per wakeup or as the default.
+- **Review depths.** Light, normal and thorough, mapped onto each engine's
+  effort, turn budget and time limit.
+- **Repository wakeups.** Check a repository on a schedule and review new pull
+  requests, with branch, author and draft filters, a per-check cap and optional
+  re-review on push.
+- **Settings in the app.** Engine, models (listed live where the engine can),
+  depth, concurrency, time limit and spend caps change without a restart.
+- **Ask about a finding.** A thread under each note, answered by the engine
+  from the read-only checkout.
+- **Second opinion.** Another engine reviews the same change beside the
+  review; agreement is shown and its findings can be adopted.
+- **Learning and rules.** Dismissed and won't-fix findings, per-repository
+  rules and a repository's own `.selfcheck.md` shape later reviews.
+- **Local branches.** Review a branch of a repository on this machine before
+  pushing it, without writing to that repository.
+- **Spend caps.** Daily and monthly caps pause automatic reviews.
+- **Dashboard.** Activity heatmap, reviews over time, findings by severity
+  and category, engine performance, developers, and who gets the reviews;
+  every number opens the reviews behind it.
+- **Navigation.** Home, Reviews, Wakeups and Settings tabs; adding a review is
+  the first thing on Home; a since-you-were-last-here strip, a first-run guide
+  and desktop notifications.
+- Assignees and requested reviewers are read from the forge.
+- CI on every pull request, a release on every merge, CodeQL, Dependabot, and
+  the community files.
+
+### Changed
+
+- A refreshed OKLCH palette and an explicit Auto / Light / Dark switch.
+
+### Fixed
+
+- Syncing a GitLab merge request no longer zeroes its line counts.
+- An update to the UI is no longer hidden behind a cached page.
+
+## [0.1.0] - 2026-10-15
+
+### Added
+
+- Track GitHub pull requests and GitLab merge requests by URL and review them
+  with Claude Code against a read-only checkout.
+- A diff view with syntax highlighting, word-level diffs, inline findings and
+  per-file viewed state; notes you can triage, edit and copy as markdown.
+- Re-reviews that replace the previous run and keep your decisions; watching a
+  pull request for new commits.
+- A Claude Code skill and an agent-facing API.
+
+[Unreleased]: https://github.com/Unchained-Labs/selfcheck/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Unchained-Labs/selfcheck/releases/tag/v0.1.0

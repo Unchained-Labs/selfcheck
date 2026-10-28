@@ -1,0 +1,193 @@
+name: Release
+
+# Every pull request merged into main releases a new version:
+#   1. plan   - how much to bump: the merged PR's release:* label, else its
+#               title (feat -> minor, `!`/BREAKING -> major), else patch
+#               (scripts/release/plan.py);
+#   2. bump   - write the version everywhere, date CHANGELOG.md's [Unreleased],
+#               commit "Release vX.Y.Z" to main and tag it;
+#   3. github - a GitHub release with that changelog section and a source
+#               tarball that includes the built web UI;
+#   4. image  - a multi-arch Docker image on ghcr.io.
+# Pushing a v* tag by hand releases that tag as it is; running the workflow by
+# hand bumps the part you pick. The bump is pushed with the workflow token,
+# which starts no further workflow, so a release never triggers another.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Part of the version to bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Decide what to release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      bump: ${{ steps.plan.outputs.bump }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_BUMP: ${{ inputs.bump }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "${GITHUB_EVENT_NAME}" = workflow_dispatch ]; then
+            echo "bump=${DISPATCH_BUMP}" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          pr="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '.[0]' 2>/dev/null || true)"
+          if [ -n "$pr" ] && [ "$pr" != "null" ]; then
+            title="$(printf '%s' "$pr" | jq -r '.title')"
+            labels="$(printf '%s' "$pr" | jq -r '[.labels[].name] | join(",")')"
+          else
+            # A direct push to main still releases; its message stands in for a title.
+            title="$(printf '%s' "$COMMIT_MESSAGE" | head -n1)"; labels=""
+          fi
+          bump="$(python3 scripts/release/plan.py --title "$title" --labels "$labels")"
+          echo "bump=${bump}" >> "$GITHUB_OUTPUT"
+
+  bump:
+    name: Bump, commit and tag
+    needs: plan
+    if: needs.plan.outputs.bump != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - id: bump
+        env:
+          PART: ${{ needs.plan.outputs.bump }}
+        run: |
+          version="$(python3 scripts/release/bump.py "${PART}")"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "Release v${version}"
+          git tag -a "v${version}" -m "selfcheck ${version}"
+          git push origin HEAD:main "v${version}"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+
+  github:
+    name: GitHub release
+    needs: [plan, bump]
+    if: ${{ !cancelled() && (needs.plan.outputs.tag != '' || needs.bump.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - id: tag
+        env:
+          TAG: ${{ needs.plan.outputs.tag || needs.bump.outputs.tag }}
+        run: echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+      - name: Check the tag matches the version
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: test "v$(python3 scripts/release/bump.py --check)" = "${TAG}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the web UI
+        working-directory: web
+        run: corepack enable && pnpm install --frozen-lockfile && pnpm build
+      - name: Source tarball with the UI prebuilt
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          name="selfcheck-${TAG#v}"
+          git archive --prefix="${name}/" -o "${name}.tar" HEAD
+          tar --transform "s,^,${name}/," -rf "${name}.tar" web/dist
+          gzip -9 "${name}.tar"
+      - name: Release notes from the changelog
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          version="${TAG#v}"
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found && /^\[.*\]: / { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          {
+            echo
+            echo '## Run it'
+            echo
+            echo '```sh'
+            echo "docker run --rm -p 127.0.0.1:7777:7777 -v ./data:/app/data ghcr.io/unchained-labs/selfcheck:${version}"
+            echo '```'
+            echo
+            echo "Or download \`selfcheck-${version}.tar.gz\` below (UI prebuilt, no Node needed) and run \`make serve\`."
+          } >> notes.md
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: selfcheck ${{ steps.tag.outputs.tag }}
+          body_path: notes.md
+          files: selfcheck-*.tar.gz
+
+  image:
+    name: Docker image
+    needs: github
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.github.outputs.tag }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.github.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.github.outputs.tag }}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

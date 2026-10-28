@@ -122,8 +122,8 @@ def _rehydrate(files: list[dict[str, Any]]) -> list[DiffFile]:
                 old_count=h["old_count"], new_start=h["new_start"], new_count=h["new_count"],
             )
             hunk.lines = [
-                DiffLine(l["kind"], l["content"], l["old_line"], l["new_line"])
-                for l in h["lines"]
+                DiffLine(ln["kind"], ln["content"], ln["old_line"], ln["new_line"])
+                for ln in h["lines"]
             ]
             df.hunks.append(hunk)
         out.append(df)

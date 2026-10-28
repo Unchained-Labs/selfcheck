@@ -1,0 +1,40 @@
+name: Release preview
+
+# Every merged pull request ships a release (see release.yml). This says, on the
+# pull request itself, which version merging it will produce and why, and
+# refuses a pull request that carries more than one release label.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: What merging releases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - env:
+          TITLE: ${{ github.event.pull_request.title }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          part="$(python3 scripts/release/plan.py --title "$TITLE" --labels "$LABELS" 2> reason.txt)"
+          current="$(python3 scripts/release/bump.py --check)"
+          next="$(python3 - "$current" "$part" <<'PY'
+          import sys
+          major, minor, patch = map(int, sys.argv[1].split("."))
+          part = sys.argv[2]
+          print({"major": f"{major + 1}.0.0", "minor": f"{major}.{minor + 1}.0"}.get(part, f"{major}.{minor}.{patch + 1}"))
+          PY
+          )"
+          {
+            echo "### Merging this releases **v${next}**"
+            echo
+            echo "$(cat reason.txt). Current version: v${current}."
+            echo
+            echo "Change it with one label: \`release:major\`, \`release:minor\` or \`release:patch\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat reason.txt

@@ -1,5 +1,10 @@
 # selfcheck
 
+[![CI](https://github.com/Unchained-Labs/selfcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/Unchained-Labs/selfcheck/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Unchained-Labs/selfcheck?sort=semver)](https://github.com/Unchained-Labs/selfcheck/releases)
+[![Docker image](https://img.shields.io/badge/ghcr.io-selfcheck-2496ED?logo=docker&logoColor=white)](https://github.com/Unchained-Labs/selfcheck/pkgs/container/selfcheck)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue)](LICENSE)
+
 A local, self-hosted review workbench for GitHub pull requests and GitLab merge
 requests. Paste a link — or let a wakeup pick new ones up from a repository —
 and a coding agent you already have (Claude Code, Codex, Cursor Agent) or a
@@ -471,3 +476,15 @@ restart. `.env` stays the default; *Reset* in the app goes back to it.
   from the checkout, but a 10,000-line PR is still a 10,000-line PR.
 - The first review of a big repository pays for the initial fetch. It is cached
   after that.
+
+## Contributing
+
+Issues and pull requests are welcome — start with
+[CONTRIBUTING.md](CONTRIBUTING.md). Every pull request merged into `main`
+ships a release automatically: version bumped, changelog dated, tag, GitHub
+release and Docker image. Security problems, above all any way around the
+read-only promise, go through [SECURITY.md](SECURITY.md).
+
+## License
+
+[BSD 3-Clause](LICENSE) © Erwin Lejeune.

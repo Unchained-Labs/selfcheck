@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: If you use selfcheck in your work, please cite it as below.
+title: "selfcheck: a local, read-only review workbench for pull requests"
+type: software
+authors:
+  - family-names: Lejeune
+    given-names: Erwin
+repository-code: https://github.com/Unchained-Labs/selfcheck
+license: BSD-3-Clause
+keywords: [code review, pull requests, merge requests, llm, read-only]

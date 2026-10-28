@@ -15,7 +15,7 @@ SELFCHECK_MAX_CONCURRENT_RUNS.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from . import db, prompts, service
@@ -40,7 +40,7 @@ def _parse_ts(raw: str) -> datetime | None:
         ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+    return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
 
 
 def next_check(watch: dict[str, Any], after: datetime | None = None) -> str:
@@ -49,7 +49,7 @@ def next_check(watch: dict[str, Any], after: datetime | None = None) -> str:
     A daily wakeup with `daily_at` fires at that wall-clock time in the
     server's timezone; anything else fires `interval_minutes` after `after`.
     """
-    after = after or datetime.now(timezone.utc)
+    after = after or datetime.now(UTC)
     interval = max(MIN_INTERVAL, int(watch.get("interval_minutes") or 1440))
     m = _DAILY_AT.match(watch.get("daily_at") or "")
     if m and interval % 1440 == 0:
@@ -58,7 +58,7 @@ def next_check(watch: dict[str, Any], after: datetime | None = None) -> str:
         if target <= local:
             target += timedelta(days=1)
         target += timedelta(days=interval // 1440 - 1)
-        return target.astimezone(timezone.utc).isoformat(timespec="seconds")
+        return target.astimezone(UTC).isoformat(timespec="seconds")
     return (after + timedelta(minutes=interval)).isoformat(timespec="seconds")
 
 

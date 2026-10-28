@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -30,7 +31,7 @@ async def _stream(topic: str, request: Request) -> AsyncIterator[str]:
                 break
             try:
                 ev = await asyncio.wait_for(queue.get(), timeout=20)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 yield ": keepalive\n\n"
                 continue
             yield _sse(ev)

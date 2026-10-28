@@ -10,8 +10,8 @@ from fastapi import APIRouter, Body, HTTPException
 
 from .. import service, settings_store
 from ..config import get_settings
-from ..models import RepoRulesIn
 from ..engines import ENGINE_IDS, describe_engines
+from ..models import RepoRulesIn
 from ..subproc import CliNotFound
 
 router = APIRouter(prefix="/api", tags=["settings"])

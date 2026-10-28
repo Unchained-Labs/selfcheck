@@ -121,7 +121,7 @@ def test_line_numbers_are_absolute():
     app = next(f for f in parse_unified_diff(SAMPLE) if f.path == "src/app.py")
     lines = app.hunks[0].lines
 
-    assert [(l.kind, l.old_line, l.new_line) for l in lines[:5]] == [
+    assert [(ln.kind, ln.old_line, ln.new_line) for ln in lines[:5]] == [
         ("context", 10, 10),
         ("context", 11, 11),
         ("del", 12, None),

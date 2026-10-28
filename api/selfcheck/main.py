@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, scheduler, service, settings_store
+from . import __version__, db, scheduler, service, settings_store
 from .config import REPO_ROOT, get_settings
 from .providers.http import WriteAttemptBlocked
 from .routes import agent, analytics, reviews, runs, system, wakeups
@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title="selfcheck",
-        version="0.1.0",
+        version=__version__,
         description=DESCRIPTION,
         lifespan=lifespan,
     )
