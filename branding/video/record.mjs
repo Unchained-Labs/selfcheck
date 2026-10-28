@@ -36,7 +36,8 @@ const api = async (path, init) => (await fetch(BASE + path, init)).json()
 const OVERLAY = `
 (() => {
   try {
-    localStorage.setItem('selfcheck.theme', localStorage.getItem('selfcheck.theme') || 'dark')
+    // Every scene starts dark; only the engines scene toggles the theme, in-page.
+    localStorage.setItem('selfcheck.theme', 'dark')
     if (!localStorage.getItem('selfcheck.lastActive'))
       localStorage.setItem('selfcheck.lastActive', new Date(Date.now() - 20 * 3600e3).toISOString())
   } catch {}
@@ -155,7 +156,7 @@ const SCENES = {
     await page.click('.addbar-input input')
     await page.keyboard.type(LIVE_PR, { delay: 28 })
     await sleep(500)
-    await click(page, '.seg.xs button', { text: 'Light' })
+    await click(page, '.addbar .seg.xs button', { text: 'Light' })  // depth, not the theme switch
     await click(page, '.addbar-go')
     await caption(page, 'The engine reads a <b>read-only checkout</b>. Nothing is ever posted back.')
     await page.waitForSelector('.runbar', { visible: true, timeout: 30000 })
