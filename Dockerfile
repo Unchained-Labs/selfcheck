@@ -11,7 +11,7 @@
 # and Debian bookworm's Python 3.11 satisfies the API's floor.
 
 # ── build the web UI ───────────────────────────────────────────────────────
-FROM node:22-bookworm-slim AS web
+FROM node:25-bookworm-slim AS web
 
 WORKDIR /build
 RUN corepack enable
@@ -21,7 +21,7 @@ COPY web/ ./
 RUN pnpm build
 
 # ── runtime ────────────────────────────────────────────────────────────────
-FROM node:22-bookworm-slim AS runtime
+FROM node:25-bookworm-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-venv git ca-certificates curl tini \
