@@ -255,8 +255,12 @@ def test_git_env_clears_token_when_absent():
     assert "GIT_ASKPASS" not in env
 
 
-def test_claude_runner_denies_write_tools():
+def test_claude_runner_denies_write_tools(monkeypatch):
+    from selfcheck import claude_runner
     from selfcheck.claude_runner import ALLOWED_TOOLS, DENIED_TOOLS, build_argv
+
+    # The argv is what matters, not whether the CLI is installed where the tests run.
+    monkeypatch.setattr(claude_runner, "resolve_claude_bin", lambda: "/usr/bin/claude")
 
     assert set(ALLOWED_TOOLS) == {"Read", "Grep", "Glob"}
     for tool in ("Bash", "Write", "Edit", "WebFetch", "WebSearch"):
