@@ -4,7 +4,7 @@ import { copyText } from './lib/clipboard'
 import { notesToMarkdown } from './lib/noteText'
 import { timeAgo } from './lib/time'
 import { apply, loadPref, onSystemChange, resolve, savePref, type Theme, type ThemePref } from './lib/theme'
-import { effectiveChoice, engineLabel, findEngine, forgeName, isRunning } from './lib/labels'
+import { effectiveChoice, engineLabel, findEngine, forgeName, isRunning, nsLabel } from './lib/labels'
 import type {
   DiffPayload, EngineId, Mode, Note, Review, ReviewDetail, Severity, Status, Wakeup,
 } from './lib/types'
@@ -668,7 +668,7 @@ export function App() {
                 </button>
                 <Icon name="repo" size={14} />
                 <span className="crumb-repo truncate">
-                  <span className="repo-ns">{review.namespace}/</span>{review.project}
+                  <span className="repo-ns">{nsLabel(review)}/</span>{review.project}
                 </span>
                 <Icon name="chevron-right" size={12} className="faint" />
                 <span className="mono">{review.provider === 'gitlab' ? '!' : '#'}{review.number}</span>

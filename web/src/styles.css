@@ -17,7 +17,7 @@
   --border-strong: oklch(0.345 0.018 var(--hue));
   --fg: oklch(0.955 0.006 var(--hue));
   --fg-muted: oklch(0.76 0.016 var(--hue));
-  --fg-faint: oklch(0.58 0.018 var(--hue));
+  --fg-faint: oklch(0.625 0.018 var(--hue));
 
   --accent: oklch(0.80 0.115 188);
   --accent-strong: oklch(0.74 0.12 190);
@@ -65,8 +65,8 @@
   --heat-2: #17938b;
   --heat-3: #39c2b8;
   --heat-4: #61eadf;
-  --mono: "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", "Fira Code", Menlo, Consolas, monospace;
-  --sans: "Inter Variable", Inter, "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --line: 20px;
   --radius-sm: 6px;
   --radius: 8px;
@@ -91,7 +91,7 @@
   --border-strong: oklch(0.845 0.013 var(--hue));
   --fg: oklch(0.25 0.02 var(--hue));
   --fg-muted: oklch(0.48 0.022 var(--hue));
-  --fg-faint: oklch(0.63 0.018 var(--hue));
+  --fg-faint: oklch(0.53 0.018 var(--hue));
 
   --accent: oklch(0.58 0.105 192);
   --accent-strong: oklch(0.52 0.105 194);
@@ -109,19 +109,19 @@
   --del-bg-strong: oklch(0.88 0.065 22);
   --del-gutter: oklch(0.93 0.04 22);
 
-  --sev-blocker: oklch(0.56 0.17 25);
-  --sev-major: oklch(0.60 0.14 50);
-  --sev-minor: oklch(0.62 0.12 82);
+  --sev-blocker: oklch(0.55 0.17 25);
+  --sev-major: oklch(0.545 0.14 50);
+  --sev-minor: oklch(0.535 0.12 82);
   --sev-nit: oklch(0.52 0.02 var(--hue));
   --sev-question: oklch(0.54 0.14 295);
-  --sev-praise: oklch(0.55 0.12 155);
+  --sev-praise: oklch(0.52 0.12 155);
 
-  --ok: oklch(0.58 0.12 155);
+  --ok: oklch(0.52 0.12 155);
   --merged: oklch(0.54 0.14 295);
-  --bad: oklch(0.56 0.17 25);
-  --state-open: oklch(0.58 0.12 155);
-  --state-merged: oklch(0.54 0.14 295);
-  --state-closed: oklch(0.56 0.16 25);
+  --bad: oklch(0.55 0.17 25);
+  --state-open: oklch(0.5 0.12 155);
+  --state-merged: oklch(0.5 0.14 295);
+  --state-closed: oklch(0.52 0.16 25);
 
   --scrim: oklch(0.25 0.02 var(--hue) / 0.4);
 
@@ -292,11 +292,7 @@ kbd {
 }
 .sidebar-head { padding: 14px 12px 10px; display: grid; gap: 12px; }
 .brand { display: flex; align-items: center; gap: 9px; }
-.logo {
-  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px;
-  color: var(--accent-fg); background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 2px 8px var(--accent-ring);
-}
+.logo { width: 26px; height: 26px; border-radius: 7px; flex: none; box-shadow: 0 2px 10px var(--accent-ring); }
 .brand-name { font-weight: 650; font-size: 14.5px; letter-spacing: -.015em; }
 .brand .ro {
   display: inline-flex; align-items: center; gap: 3px;

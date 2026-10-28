@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { applyFilters, describe, type ReviewFilters } from '../lib/filters'
-import { engineLabel, isRunning, MODE_LABEL } from '../lib/labels'
+import { engineLabel, isRunning, MODE_LABEL, nsLabel } from '../lib/labels'
 import { timeAgo } from '../lib/time'
 import type { Review, Severity, Status } from '../lib/types'
 import { AddBar } from './AddBar'
@@ -167,7 +167,7 @@ export function ReviewsPage({
                       <td><span className={`state-dot ${r.draft ? 'draft' : r.state}`} title={r.draft ? 'draft' : r.state} /></td>
                       <td className="pr-cell">
                         <span className="truncate pr-title">{r.title || r.url}</span>
-                        <span className="faint pr-sub">{r.namespace}/<b>{r.project}</b> #{r.number}{r.repo_watch_id && <> · <Icon name="alarm" size={11} /></>}</span>
+                        <span className="faint pr-sub">{nsLabel(r)}/<b>{r.project}</b> #{r.number}{r.repo_watch_id && <> · <Icon name="alarm" size={11} /></>}</span>
                       </td>
                       <td>{r.author}</td>
                       <td>

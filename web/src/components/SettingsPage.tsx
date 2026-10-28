@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../lib/api'
-import { MODE_ICON, MODE_LABEL, repoKey } from '../lib/labels'
+import { MODE_ICON, MODE_LABEL, nsLabel, repoKey } from '../lib/labels'
 import * as notify from '../lib/notify'
 import type { EngineInfo, Mode, RepoRules, Review, SettingsSnapshot, SettingsValues, Status } from '../lib/types'
 import { Icon, Spinner } from './Icon'
@@ -297,7 +297,7 @@ function RepoRulesEditor({ reviews, flash }: { reviews: Review[]; flash: (t: str
         <select id="rules-repo" className="input" value={repo} onChange={(e) => setRepo(e.target.value)}>
           {repos.map((r) => {
             const key = repoKey(r)
-            return <option key={key} value={key}>{r.namespace}/{r.project}{withRules.has(key) ? '  •  customised' : ''}</option>
+            return <option key={key} value={key}>{nsLabel(r)}/{r.project}{withRules.has(key) ? '  •  customised' : ''}</option>
           })}
         </select>
       </div>

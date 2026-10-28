@@ -147,7 +147,10 @@ export function buildModel(data: AnalyticsData, range: Range) {
 
   const runs = data.runs.filter((r) => within(r.created_at, start, end))
   const prevRuns = data.runs.filter((r) => within(r.created_at, prevStart, prevEnd))
-  const finished = runs.filter((r) => ['done', 'failed', 'cancelled'].includes(r.status))
+  // Success counts every kind of run, second opinions included; cancelled runs
+  // are your call, not a failure, so they are left out of both sides.
+  const succeeded = runs.filter((r) => r.status === 'done').length
+  const failedRuns = runs.filter((r) => r.status === 'failed').length
   // Findings come from reviews; a second opinion's are a comparison, not new findings.
   const isReview = (r: ARun) => r.kind !== 'second_opinion'
   const done = runs.filter((r) => r.status === 'done' && isReview(r))
@@ -231,7 +234,7 @@ export function buildModel(data: AnalyticsData, range: Range) {
       prs: { cur: addedPrs.length, prev: prevAddedPrs.length },
       medianMs: { cur: quantile(durations, 0.5), prev: quantile(prevDurations, 0.5) },
       spend: { cur: spend, prev: prevSpend },
-      success: { cur: finished.length ? done.length / finished.length : null },
+      success: { cur: succeeded + failedRuns ? succeeded / (succeeded + failedRuns) : null },
       noise: { cur: judged ? dismissed / judged : null, judged },
       perRun: { cur: done.length ? findings / done.length : 0 },
     },
