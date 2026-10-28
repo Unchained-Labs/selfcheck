@@ -7,6 +7,7 @@ import { pairReplacements, wordDiff, type Segment } from '../lib/worddiff'
 import type { DiffFile, DiffLine, Hunk, Note } from '../lib/types'
 import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
+import { Icon } from './Icon'
 
 export interface DiffViewOptions {
   split: boolean
@@ -579,7 +580,7 @@ const DiffFileView = memo(function DiffFileView({
           onClick={() => setCollapsed((c) => !c)}
           title={collapsed ? 'Expand' : 'Collapse'}
         >
-          {collapsed ? '▸' : '▾'}
+          <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={14} />
         </button>
         <span className="path" title={file.path}>
           {file.status === 'renamed' ? `${file.old_path} → ${file.new_path}` : file.path}

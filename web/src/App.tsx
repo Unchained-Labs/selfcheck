@@ -3,16 +3,29 @@ import { api } from './lib/api'
 import { copyText } from './lib/clipboard'
 import { notesToMarkdown } from './lib/noteText'
 import { timeAgo } from './lib/time'
-import type { DiffPayload, Note, Review, ReviewDetail, Severity, Status } from './lib/types'
+import { apply, loadPref, onSystemChange, resolve, savePref, type Theme, type ThemePref } from './lib/theme'
+import { effectiveChoice, engineLabel, findEngine, forgeName, isRunning } from './lib/labels'
+import type {
+  DiffPayload, EngineId, Mode, Note, Review, ReviewDetail, Severity, Status, Wakeup,
+} from './lib/types'
+import { AddDialog } from './components/AddBar'
 import { CopyButton } from './components/CopyButton'
 import { DiffView, type DiffViewOptions } from './components/DiffView'
 import { FilePane } from './components/FilePane'
+import { Icon } from './components/Icon'
 import { NoteComposer } from './components/NoteComposer'
 import { NotesPane } from './components/NotesPane'
+import { Overview } from './components/Overview'
+import { ReviewButton } from './components/ReviewButton'
 import { RunBar } from './components/RunBar'
 import { ShortcutsOverlay } from './components/ShortcutsOverlay'
-import { Sidebar } from './components/Sidebar'
+import { ReviewsPage } from './components/ReviewsPage'
+import { SettingsPage } from './components/SettingsPage'
+import { Sidebar, type Page, type View } from './components/Sidebar'
+import { fromQuery, toQuery, type ReviewFilters } from './lib/filters'
+import * as notify from './lib/notify'
 import { SummaryPane } from './components/SummaryPane'
+import { WakeupsPage } from './components/Wakeups'
 
 type Tab = 'summary' | 'diff' | 'notes'
 
@@ -36,31 +49,71 @@ function loadOptions(): DiffViewOptions {
 
 const TABS: Tab[] = ['summary', 'diff', 'notes']
 
-/** Route shape: #/r/<review id>[/<tab>] — so a tab is linkable and survives a
- *  reload, which matters when you are half way through a long diff. */
-function parseRoute(): { id: string | null; tab: Tab } {
-  const m = /^#\/r\/([^/]+)(?:\/(\w+))?$/.exec(window.location.hash)
-  if (!m) return { id: null, tab: 'summary' }
+interface Route { view: View; id: string | null; tab: Tab; repo: string | null; filters: ReviewFilters }
+
+/** Route shapes, so every page is linkable and survives a reload:
+ *    #/                      home
+ *    #/reviews?author=…      the review list, filtered
+ *    #/wakeups[?repo=…]      wakeups, optionally focused on one repo
+ *    #/settings
+ *    #/r/<review id>[/<tab>] one review — a tab survives a reload, which
+ *                            matters half way through a long diff */
+function parseRoute(): Route {
+  const hash = window.location.hash
+  const base = { id: null, tab: 'summary' as Tab, repo: null, filters: {} }
+  const w = /^#\/wakeups(?:\?repo=(.+))?$/.exec(hash)
+  if (w) return { ...base, view: 'wakeups', repo: w[1] ? decodeURIComponent(w[1]) : null }
+  const list = /^#\/reviews(\?.*)?$/.exec(hash)
+  if (list) return { ...base, view: 'reviews', filters: fromQuery(list[1] ?? '') }
+  if (/^#\/settings/.test(hash)) return { ...base, view: 'settings' }
+  const m = /^#\/r\/([^/]+)(?:\/(\w+))?$/.exec(hash)
+  if (!m) return { ...base, view: 'home' }
   const tab = TABS.includes(m[2] as Tab) ? (m[2] as Tab) : 'summary'
-  return { id: decodeURIComponent(m[1]), tab }
+  return { ...base, view: 'review', id: decodeURIComponent(m[1]), tab }
+}
+
+/** "Since you were last here" means since your previous session ended — not
+ *  since the last reload. A session ends after 30 minutes away. */
+const SINCE_MARK = 'selfcheck.sinceMark'
+const LAST_ACTIVE = 'selfcheck.lastActive'
+const SESSION_GAP_MS = 30 * 60_000
+
+function sessionMark(): string {
+  try {
+    const lastActive = localStorage.getItem(LAST_ACTIVE) ?? ''
+    let mark = localStorage.getItem(SINCE_MARK) ?? ''
+    if (!lastActive || Date.now() - Date.parse(lastActive) > SESSION_GAP_MS) {
+      mark = lastActive          // a new session: changes since you last left
+      localStorage.setItem(SINCE_MARK, mark)
+    }
+    localStorage.setItem(LAST_ACTIVE, new Date().toISOString())
+    return mark
+  } catch {
+    return ''
+  }
 }
 
 export function App() {
   const [reviews, setReviews] = useState<Review[]>([])
+  const [wakeups, setWakeups] = useState<Wakeup[]>([])
   const [status, setStatus] = useState<Status | null>(null)
+  const [view, setView] = useState<View>(() => parseRoute().view)
+  const [focusRepo, setFocusRepo] = useState<string | null>(() => parseRoute().repo)
+  const [filters, setFiltersState] = useState<ReviewFilters>(() => parseRoute().filters)
+  const [lastSeen, setLastSeen] = useState<string>(sessionMark)
   const [activeId, setActiveId] = useState<string | null>(() => parseRoute().id)
   const [detail, setDetail] = useState<ReviewDetail | null>(null)
   const [diff, setDiff] = useState<DiffPayload | null>(null)
   const [tab, setTabState] = useState<Tab>(() => parseRoute().tab)
   const [options, setOptions] = useState<DiffViewOptions>(loadOptions)
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    () => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'),
-  )
+  const [themePref, setThemePrefState] = useState<ThemePref>(loadPref)
+  const [theme, setTheme] = useState<Theme>(() => resolve(loadPref()))
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState<{ text: string; err?: boolean } | null>(null)
   const [generalComposer, setGeneralComposer] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pendingJump, setPendingJump] = useState<Note | null>(null)
   const [forceOpenFile, setForceOpenFile] = useState<string | null>(null)
@@ -75,6 +128,9 @@ export function App() {
   useEffect(() => {
     const onHash = () => {
       const r = parseRoute()
+      setView(r.view)
+      setFocusRepo(r.repo)
+      setFiltersState(r.filters)
       setActiveId(r.id)
       setTabState(r.tab)
     }
@@ -82,6 +138,7 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
+  const refreshListRef = useRef<() => Promise<void>>(async () => undefined)
   const activeIdRef = useRef(activeId)
   activeIdRef.current = activeId
 
@@ -96,23 +153,105 @@ export function App() {
 
   const select = useCallback((id: string) => {
     window.location.hash = `#/r/${encodeURIComponent(id)}`
+    setView('review')
     setActiveId(id)
     setTabState('summary')
     setSidebarOpen(false)
   }, [])
 
+  const navigate = useCallback((to: Page, repo?: string) => {
+    window.location.hash = to === 'home' ? '#/'
+      : to === 'wakeups' ? `#/wakeups${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`
+        : `#/${to}`
+    setView(to)
+    setFocusRepo(repo ?? null)
+    if (to === 'reviews') setFiltersState({})
+    setActiveId(null)
+    setSidebarOpen(false)
+  }, [])
+
+  /** A review was just added from the bar or the dialog: show it. */
+  const onAdded = useCallback((added: Review) => {
+    void refreshListRef.current()
+    select(added.id)
+  }, [select])
+
+  /** The Reviews tab with these filters — what every clickable number opens. */
+  const openReviews = useCallback((next: ReviewFilters) => {
+    window.location.hash = `#/reviews${toQuery(next)}`
+    setView('reviews')
+    setFiltersState(next)
+    setActiveId(null)
+    setSidebarOpen(false)
+  }, [])
+
+  // Typing in the search box should not stack history entries.
+  const setFilters = useCallback((next: ReviewFilters) => {
+    setFiltersState(next)
+    window.history.replaceState(null, '', `#/reviews${toQuery(next)}`)
+  }, [])
+
+  // Keep "last active" current while the tab is open, so the next session
+  // knows when this one ended.
+  useEffect(() => {
+    const touch = () => {
+      try { localStorage.setItem(LAST_ACTIVE, new Date().toISOString()) } catch { /* private mode */ }
+    }
+    const t = window.setInterval(() => document.visibilityState === 'visible' && touch(), 60_000)
+    window.addEventListener('pagehide', touch)
+    return () => { window.clearInterval(t); window.removeEventListener('pagehide', touch) }
+  }, [])
+
+  const markSeen = useCallback(() => {
+    const now = new Date().toISOString()
+    try { localStorage.setItem(SINCE_MARK, now) } catch { /* private mode */ }
+    setLastSeen(now)
+  }, [])
+
   /* ── data ────────────────────────────────────────────────────────────── */
   const refreshList = useCallback(async () => {
     try {
-      setReviews(await api.listReviews())
+      // Wakeups are secondary: an older server without them must not cost
+      // you the review list.
+      const [list, wakes] = await Promise.all([
+        api.listReviews(),
+        api.listWakeups().catch(() => [] as Wakeup[]),
+      ])
+      setReviews(list)
+      setWakeups(wakes)
     } catch (e) {
       flash(`Could not list reviews: ${e instanceof Error ? e.message : e}`, true)
     }
   }, [flash])
 
+  refreshListRef.current = refreshList
+
   useEffect(() => {
     void refreshList()
     void api.status().then(setStatus).catch(() => undefined)
+  }, [refreshList])
+
+  // Desktop notifications ride on the list refresh: a run seen in progress
+  // that is now finished raises one (see lib/notify).
+  useEffect(() => {
+    notify.checkForNotifications(reviews, notify.loadLevel(), select)
+  }, [reviews, select])
+
+  // Status carries the spend against the caps; keep it fresh with the list.
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void api.status().then(setStatus).catch(() => undefined)
+    }, 60000)
+    return () => window.clearInterval(t)
+  }, [])
+
+  // Wakeups and watches start runs on their own, so keep the list current
+  // without a reload. Quiet while the tab is hidden.
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshList()
+    }, 20000)
+    return () => window.clearInterval(t)
   }, [refreshList])
 
   const loadDetail = useCallback(async (id: string) => {
@@ -158,19 +297,35 @@ export function App() {
     })
   }, [])
 
-  const toggleTheme = useCallback(() => {
-    setTheme((t) => {
-      const next = t === 'dark' ? 'light' : 'dark'
-      document.documentElement.dataset.theme = next
-      localStorage.setItem('selfcheck.theme', next)
-      return next
-    })
+  const setThemePref = useCallback((pref: ThemePref) => {
+    setThemePrefState(pref)
+    savePref(pref)
+    const next = resolve(pref)
+    apply(next)
+    setTheme(next)
   }, [])
+
+  // Following the OS: track it when it changes, e.g. at sunset.
+  useEffect(() => {
+    if (themePref !== 'system') return
+    return onSystemChange(() => {
+      const next = resolve('system')
+      apply(next)
+      setTheme(next)
+    })
+  }, [themePref])
+
+  /** `t`: flip to the other theme and pin it. */
+  const toggleTheme = useCallback(() => {
+    setThemePref(theme === 'dark' ? 'light' : 'dark')
+  }, [theme, setThemePref])
 
   /* ── derived ─────────────────────────────────────────────────────────── */
   const review = detail?.review ?? null
   const latestRun = detail?.latest_run ?? null
-  const running = !!latestRun && ['queued', 'preparing', 'analyzing'].includes(latestRun.status)
+  const running = isRunning(latestRun?.status)
+  const choice = effectiveChoice(review, status)
+  const chosenEngine = findEngine(status, choice.engine)
   const notes: Note[] = useMemo(() => detail?.notes ?? [], [detail])
   const openNotes = useMemo(() => notes.filter((n) => n.status === 'open'), [notes])
 
@@ -259,19 +414,30 @@ export function App() {
     }
   }, [activeId, loadDetail, refreshList, flash])
 
-  const doReview = useCallback(async () => {
+  const doReview = useCallback(async (pick?: { mode: Mode; engine: EngineId }) => {
     if (!activeId) return
     setBusy('run')
     try {
-      await api.startRun(activeId)
+      await api.startRun(activeId, pick ?? {})
       await loadDetail(activeId)
+      void refreshList()
       setTab('summary')
     } catch (e) {
       flash(`Could not start the review: ${e instanceof Error ? e.message : e}`, true)
     } finally {
       setBusy('')
     }
-  }, [activeId, loadDetail, flash, setTab])
+  }, [activeId, loadDetail, refreshList, flash, setTab])
+
+  const saveDefaults = useCallback(async (pick: { mode: Mode | ''; engine: EngineId | '' }) => {
+    if (!activeId) return
+    try {
+      await api.setFlags(activeId, pick)
+      refreshDetail()
+    } catch (e) {
+      flash(`Could not save the defaults: ${e instanceof Error ? e.message : e}`, true)
+    }
+  }, [activeId, refreshDetail, flash])
 
   const toggleWatch = useCallback(async () => {
     if (!review) return
@@ -331,6 +497,7 @@ export function App() {
         return
       }
       if (e.key === '?') { setShowShortcuts((s) => !s); e.preventDefault(); return }
+      if (e.key === 'a') { setShowAdd(true); e.preventDefault(); return }
       if (!review) return
 
       switch (e.key) {
@@ -374,16 +541,36 @@ export function App() {
   ])
 
   /* ── render ──────────────────────────────────────────────────────────── */
+  const tabButton = (id: Tab, icon: string, label: string, count?: number) => (
+    <button className={`tab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
+      <Icon name={icon} size={14} />
+      {label}
+      {count !== undefined && <span className="n">{count}</span>}
+    </button>
+  )
+
   return (
     <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
       <Sidebar
         reviews={reviews}
+        wakeups={wakeups}
         activeId={activeId}
         status={status}
-        theme={theme}
+        themePref={themePref}
+        view={view}
         onSelect={select}
-        onChanged={refreshList}
-        onToggleTheme={toggleTheme}
+        onThemePref={setThemePref}
+        onNewReview={() => { setSidebarOpen(false); setShowAdd(true) }}
+        onNavigate={navigate}
+        onEngine={async (engine) => {
+          try {
+            await api.updateSettings({ engine })
+            setStatus(await api.status())
+            flash(`${engineLabel(engine, status)} is now the default engine`)
+          } catch (e) {
+            flash(`Could not switch engine: ${e instanceof Error ? e.message : e}`, true)
+          }
+        }}
       />
       <div
         className="sidebar-scrim"
@@ -392,59 +579,128 @@ export function App() {
       />
 
       <main className="main">
-        {!review && (
-          <div className="blank">
-            <h2>selfcheck</h2>
-            <p>
-              Paste a GitHub pull request or GitLab merge request link on the left.
-              <br />
-              Claude reads the change against a read-only checkout and writes review notes here.
-            </p>
-            <p className="faint">Nothing is ever posted back to the forge — selfcheck only reads.</p>
-            <button className="btn" onClick={() => setShowShortcuts(true)}>
-              Keyboard shortcuts <kbd>?</kbd>
+        {view !== 'review' && (
+          <div className="mobile-bar">
+            <button
+              className="icon-btn"
+              onClick={() => setSidebarOpen((s) => !s)}
+              aria-label="Show tracked reviews"
+            >
+              <Icon name="menu" />
             </button>
+            <span className="brand-name">selfcheck</span>
           </div>
         )}
 
-        {review && (
+        {view === 'home' && (
+          <div className="scroller">
+            <Overview
+              reviews={reviews}
+              wakeups={wakeups}
+              status={status}
+              lastSeen={lastSeen}
+              onSeen={markSeen}
+              onOpen={select}
+              onFilter={openReviews}
+              onNavigate={navigate}
+              onAdded={onAdded}
+              onShortcuts={() => setShowShortcuts(true)}
+            />
+          </div>
+        )}
+
+        {view === 'reviews' && (
+          <div className="scroller">
+            <ReviewsPage
+              reviews={reviews}
+              status={status}
+              filters={filters}
+              onFilters={setFilters}
+              onOpen={select}
+              onAdded={onAdded}
+              onWakeup={(key) => navigate('wakeups', key)}
+            />
+          </div>
+        )}
+
+        {view === 'settings' && (
+          <div className="scroller">
+            <SettingsPage
+              // Remount when the default changes elsewhere (the footer switcher).
+              key={status?.default_engine}
+              reviews={reviews}
+              status={status}
+              onChanged={() => void api.status().then(setStatus).catch(() => undefined)}
+              flash={flash}
+            />
+          </div>
+        )}
+
+        {view === 'wakeups' && (
+          <div className="scroller">
+            <WakeupsPage
+              wakeups={wakeups}
+              reviews={reviews}
+              status={status}
+              focusRepo={focusRepo}
+              onChanged={refreshList}
+              onOpenReview={select}
+              flash={flash}
+            />
+          </div>
+        )}
+
+        {view === 'review' && !review && (
+          <div className="blank"><span className="spinner-wrap"><Icon name="pr" size={22} /></span> Loading…</div>
+        )}
+
+        {view === 'review' && review && (
           <>
             <header className="rev-head">
-              <div className="row">
+              <div className="crumbs">
                 <button
-                  className="btn ghost sm sidebar-toggle"
+                  className="icon-btn sidebar-toggle"
                   onClick={() => setSidebarOpen((s) => !s)}
                   aria-label="Show tracked reviews"
                   title="Tracked reviews"
                 >
-                  ☰
+                  <Icon name="menu" />
                 </button>
-                <span className="rev-title truncate" title={review.title}>
-                  {review.title || review.url}
+                <Icon name="repo" size={14} />
+                <span className="crumb-repo truncate">
+                  <span className="repo-ns">{review.namespace}/</span>{review.project}
                 </span>
+                <Icon name="chevron-right" size={12} className="faint" />
+                <span className="mono">{review.provider === 'gitlab' ? '!' : '#'}{review.number}</span>
                 <span className="spacer" />
-                <a className="btn sm" href={review.url} target="_blank" rel="noreferrer">
-                  Open on {review.provider === 'github' ? 'GitHub' : 'GitLab'} ↗
-                </a>
+                {review.provider === 'local' ? (
+                  <span className="chip" title={review.url}><Icon name="branch" size={12} /> local branch</span>
+                ) : (
+                  <a className="btn ghost sm" href={review.url} target="_blank" rel="noreferrer">
+                    {forgeName(review.provider)} <Icon name="external" size={12} />
+                  </a>
+                )}
               </div>
 
+              <h1 className="rev-title" title={review.title}>{review.title || review.url}</h1>
+
               <div className="rev-meta">
-                <span className={`chip ${review.state === 'open' ? 'open' : review.state === 'merged' ? 'merged' : 'closed'}`}>
+                <span className={`state-pill ${review.draft ? 'draft' : review.state}`}>
+                  <Icon name="pr" size={12} />
                   {review.draft ? 'draft' : review.state}
                 </span>
-                <span className="mono">{review.namespace}/{review.project} #{review.number}</span>
-                <span>
+                <span className="branches">
                   <span className="branch">{review.head_ref}</span>
-                  {' → '}
+                  <Icon name="arrow" size={12} className="faint" />
                   <span className="branch">{review.base_ref}</span>
                 </span>
-                <span className="mono faint" title="Head commit">{review.head_sha.slice(0, 8)}</span>
-                <span>by {review.author}</span>
+                <span>by <strong>{review.author}</strong></span>
                 <span className="fstat">
                   <span className="a">+{review.additions}</span>{' '}
                   <span className="d">−{review.deletions}</span>{' '}
-                  <span className="faint">in {review.changed_files} files</span>
+                  <span className="faint">· {review.changed_files} files</span>
                 </span>
+                <span className="mono faint" title="Head commit">{review.head_sha.slice(0, 8)}</span>
                 {review.last_synced_at && (
                   <span className="faint" title={review.last_synced_at}>
                     synced {timeAgo(review.last_synced_at)}
@@ -468,16 +724,14 @@ export function App() {
                   </div>
                 )}
                 <span className="spacer" />
-                <button className="btn sm" disabled={!!busy} onClick={doSync} title="Refetch from the forge (s)">
-                  {busy === 'sync' ? 'Syncing…' : 'Sync'}
-                </button>
                 <button
-                  className="btn sm primary"
-                  disabled={!!busy || running}
-                  onClick={doReview}
-                  title="Have Claude read the change (r)"
+                  className="btn sm"
+                  disabled={!!busy}
+                  onClick={doSync}
+                  title="Refetch from the forge (s)"
                 >
-                  {running ? 'Reviewing…' : latestRun ? 'Re-review' : 'Review with Claude'}
+                  <Icon name="sync" size={13} className={busy === 'sync' ? 'spinning' : ''} />
+                  {busy === 'sync' ? 'Syncing…' : 'Sync'}
                 </button>
                 <button
                   className={`btn sm ${review.watch ? 'on' : ''}`}
@@ -486,7 +740,8 @@ export function App() {
                     ? 'Watching: selfcheck re-reviews automatically when new commits land'
                     : 'Watch for new commits and re-review automatically'}
                 >
-                  {review.watch ? '👁 Watching' : 'Watch'}
+                  <Icon name="eye" size={13} />
+                  {review.watch ? 'Watching' : 'Watch'}
                 </button>
                 <CopyButton
                   className="btn sm"
@@ -494,77 +749,89 @@ export function App() {
                   title="Copy every open note as markdown, grouped by file (c)"
                   text={() => notesToMarkdown(openNotes)}
                 />
+                <ReviewButton
+                  review={review}
+                  status={status}
+                  running={running}
+                  busy={!!busy}
+                  hasRun={!!latestRun}
+                  onRun={(pick) => void doReview(pick)}
+                  onSaveDefaults={(pick) => void saveDefaults(pick)}
+                />
                 <button
-                  className="btn sm ghost"
+                  className="icon-btn"
                   onClick={() => setShowShortcuts(true)}
                   title="Keyboard shortcuts (?)"
                   aria-label="Keyboard shortcuts"
                 >
-                  ?
+                  <Icon name="keyboard" />
                 </button>
                 <button
-                  className="btn sm ghost danger"
+                  className="icon-btn danger"
                   onClick={doDelete}
                   title="Stop tracking this review"
                   aria-label="Stop tracking this review"
                 >
-                  ✕
+                  <Icon name="trash" />
                 </button>
               </div>
             </header>
 
-            {running && latestRun && <RunBar run={latestRun} onFinished={refreshDetail} />}
+            {running && latestRun && (
+              <RunBar
+                run={latestRun}
+                engineName={engineLabel(latestRun.engine, status)}
+                onFinished={refreshDetail}
+              />
+            )}
 
-            {status && !status.claude.available && (
+            {status && chosenEngine && !chosenEngine.available && !running && (
               <div className="banner err">
-                Claude Code CLI not available: {status.claude.error ?? 'unknown error'}
+                <Icon name="alert" size={14} />
+                {chosenEngine.label} is not available: {chosenEngine.error ?? 'unknown error'}.
+                Pick another engine from the arrow on the Review button.
               </div>
             )}
 
             <nav className="tabs">
-              <button className={`tab ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
-                Summary
-              </button>
-              <button className={`tab ${tab === 'diff' ? 'active' : ''}`} onClick={() => setTab('diff')}>
-                Files<span className="n">{diff?.files.length ?? review.changed_files}</span>
-              </button>
-              <button className={`tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => setTab('notes')}>
-                Notes<span className="n">{openNotes.length}</span>
-              </button>
+              {tabButton('summary', 'doc', 'Summary')}
+              {tabButton('diff', 'file', 'Files', diff?.files.length ?? review.changed_files)}
+              {tabButton('notes', 'note', 'Notes', openNotes.length)}
               <span className="spacer" />
               {tab === 'diff' && (
                 <div className="row diff-opts">
                   {findings.length > 0 && (
                     <>
-                      <span className="faint" style={{ fontSize: 11 }}>
+                      <span className="faint" style={{ fontSize: 11.5 }}>
                         {findings.length} finding{findings.length === 1 ? '' : 's'}
                       </span>
                       <button
-                        className="btn ghost sm"
+                        className="icon-btn"
                         onClick={() => stepFinding(-1)}
                         title="Previous finding (p)"
                         aria-label="Previous finding"
                       >
-                        ↑
+                        <Icon name="arrow-up" size={14} />
                       </button>
                       <button
-                        className="btn ghost sm"
+                        className="icon-btn"
                         onClick={() => stepFinding(1)}
                         title="Next finding (n)"
                         aria-label="Next finding"
                       >
-                        ↓
+                        <Icon name="arrow-down" size={14} />
                       </button>
                       <span className="divider" />
                     </>
                   )}
-                  <button
-                    className={`btn ghost sm ${options.split ? 'on' : ''}`}
-                    onClick={() => setOption({ split: !options.split })}
-                    title="Split / unified (u)"
-                  >
-                    {options.split ? 'Split' : 'Unified'}
-                  </button>
+                  <div className="seg sm" role="group" aria-label="Diff layout">
+                    <button className={options.split ? 'on' : ''} onClick={() => setOption({ split: true })} title="Split (u)">
+                      Split
+                    </button>
+                    <button className={!options.split ? 'on' : ''} onClick={() => setOption({ split: false })} title="Unified (u)">
+                      Unified
+                    </button>
+                  </div>
                   <button
                     className={`btn ghost sm ${options.wordDiff ? 'on' : ''}`}
                     onClick={() => setOption({ wordDiff: !options.wordDiff })}
@@ -596,9 +863,10 @@ export function App() {
                   run={latestRun}
                   runs={detail?.runs ?? []}
                   review={review}
+                  status={status}
                   notes={openNotes}
                   onNotesChanged={refreshDetail}
-                  onReview={running ? undefined : doReview}
+                  onReview={running ? undefined : () => void doReview()}
                 />
               </div>
             )}
@@ -628,7 +896,7 @@ export function App() {
                       onNotesChanged={refreshDetail}
                     />
                   ) : (
-                    <div className="blank"><span className="spin">◴</span> Loading diff…</div>
+                    <div className="blank">Loading diff…</div>
                   )}
                 </div>
               </div>
@@ -660,7 +928,19 @@ export function App() {
       </main>
 
       {showShortcuts && <ShortcutsOverlay onClose={() => setShowShortcuts(false)} />}
-      {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.text}</div>}
+      {showAdd && (
+        <AddDialog
+          onClose={() => setShowAdd(false)}
+          onAdded={onAdded}
+          onWakeup={(key) => navigate('wakeups', key)}
+        />
+      )}
+      {toast && (
+        <div className={`toast ${toast.err ? 'err' : ''}`} role="status">
+          <Icon name={toast.err ? 'alert' : 'check'} size={14} />
+          {toast.text}
+        </div>
+      )}
     </div>
   )
 }

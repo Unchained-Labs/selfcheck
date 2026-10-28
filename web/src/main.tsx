@@ -1,14 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { apply, loadPref, resolve } from './lib/theme'
 import './styles.css'
 
-const saved = localStorage.getItem('selfcheck.theme')
-if (saved === 'light' || saved === 'dark') {
-  document.documentElement.dataset.theme = saved
-} else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-  document.documentElement.dataset.theme = 'light'
-}
+// Before the first render, so the page never flashes the wrong theme.
+apply(resolve(loadPref()))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
