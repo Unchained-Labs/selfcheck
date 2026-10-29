@@ -8,6 +8,8 @@ add your change under **Unreleased** in the same pull request.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-29
+
 ## [0.3.0] - 2026-10-28
 
 ### Added
@@ -87,7 +89,8 @@ add your change under **Unreleased** in the same pull request.
   pull request for new commits.
 - A Claude Code skill and an agent-facing API.
 
-[Unreleased]: https://github.com/Unchained-Labs/selfcheck/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Unchained-Labs/selfcheck/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Unchained-Labs/selfcheck/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Unchained-Labs/selfcheck/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Unchained-Labs/selfcheck/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Unchained-Labs/selfcheck/releases/tag/v0.1.0
