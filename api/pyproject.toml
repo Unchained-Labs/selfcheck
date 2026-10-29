@@ -1,6 +1,6 @@
 [project]
 name = "selfcheck"
-version = "0.3.1"
+version = "0.3.2"
 description = "Read-only PR/MR review workbench driven by a local coding agent or an LLM API"
 requires-python = ">=3.11"
 dependencies = [
