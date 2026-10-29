@@ -49,19 +49,19 @@ const OVERLAY = `
         pointer-events: none; transition: transform .08s; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
       #__cursor.down { transform: scale(.85); }
       #__ripple { position: fixed; z-index: 99998; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%;
-        border: 2px solid #b1ce95; pointer-events: none; opacity: 0; }
+        border: 2px solid #f28c5c; pointer-events: none; opacity: 0; }
       #__ripple.on { animation: rip .45s ease-out; }
       @keyframes rip { from { opacity: .9; transform: scale(.4) } to { opacity: 0; transform: scale(1.4) } }
       #__caption { position: fixed; z-index: 99997; left: 50%; bottom: 28px; transform: translate(-50%, 12px);
         max-width: 980px; padding: 12px 22px; border-radius: 14px; font: 600 19px/1.35 Inter, system-ui, sans-serif;
-        color: #fcf6ec; background: rgba(18, 15, 12, .86); border: 1px solid rgba(177,206,149, .45);
+        color: #fef5ee; background: rgba(22, 16, 13, .86); border: 1px solid rgba(242,140,92, .45);
         box-shadow: 0 12px 40px rgba(0,0,0,.45); opacity: 0; transition: opacity .35s, transform .35s; text-align: center; }
       #__caption.on { opacity: 1; transform: translate(-50%, 0); }
-      #__caption b { color: #b1ce95; font-weight: 650; }\`
+      #__caption b { color: #f28c5c; font-weight: 650; }\`
     document.head.appendChild(style)
     const c = document.createElement('div')
     c.id = '__cursor'
-    c.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 2l15 10-7 1.5L8.5 21z" fill="#fff" stroke="#16130f" stroke-width="1.4" stroke-linejoin="round"/></svg>'
+    c.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 2l15 10-7 1.5L8.5 21z" fill="#fff" stroke="#1b1410" stroke-width="1.4" stroke-linejoin="round"/></svg>'
     const r = document.createElement('div'); r.id = '__ripple'
     const cap = document.createElement('div'); cap.id = '__caption'
     document.body.append(c, r, cap)

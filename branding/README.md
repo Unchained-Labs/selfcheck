@@ -18,7 +18,7 @@ a plain check is what remains.
 
 | File | Use it on |
 | --- | --- |
-| [`logo/mark.svg`](logo/mark.svg) | anything: sage-to-honey check on the ink tile. The app icon. |
+| [`logo/mark.svg`](logo/mark.svg) | anything: rust-to-honey check on the ink tile. The app icon. |
 | [`logo/mark-light.svg`](logo/mark-light.svg) | light pages that want a tile |
 | [`logo/mark-bare-dark.svg`](logo/mark-bare-dark.svg) / [`-light`](logo/mark-bare-light.svg) | no tile, on dark or light surfaces |
 | [`logo/favicon.svg`](logo/favicon.svg) | 16-32 px: no reflection |
@@ -31,7 +31,7 @@ a plain check is what remains.
   the check mirrored about the horizon.
 - **Clear space.** Half the tile on every side. **Smallest size:** 16 px with
   the tile (favicon variant), 24 px without.
-- **Don't** recolour the check outside the sage-honey gradient, drop the tile
+- **Don't** recolour the check outside the rust-honey gradient, drop the tile
   on mid-grey, put the reflection at full strength, or set the wordmark in
   anything but Inter.
 
@@ -46,34 +46,37 @@ chroma until the colour fits. [`tokens.css`](tokens.css) and
 
 | Family | Hue | Role |
 | --- | --- | --- |
-| **sage** | 130 | brand, focus, links, the check |
+| **rust** | 45 | brand, focus, links, the check |
 | **fern** | 160 | pass, additions |
-| **sand** | 80 | text, surfaces, borders |
+| **cocoa** | 55 | text, surfaces, borders |
 | **coral** | 22 | blocker, failure, deletions |
-| **apricot** | 55 | major, warning |
-| **honey** | 92 | minor, caution |
+| **amber** | 72 | major, warning |
+| **honey** | 95 | minor, caution |
 | **lavender** | 295 | question, merged |
 
-**Why sage.** Developer tools live in cold blue and purple; a review tool you
-open every morning should feel more like a desk than a dashboard. Sage is a
-green softened towards olive and held at low chroma (0.085), so it is warm and
-welcoming without shouting. It sits 30 degrees away from fern, the
-"passed" green, and at roughly two thirds of its chroma, so the brand is not
-mistaken for a status. The check fades from sage into honey, which adds warmth
-to the mark.
+**Why rust.** Developer tools live in cold blue and purple; a review tool you
+open every morning should feel more like a workbench than a dashboard. Rust is
+oxidised iron: a warm copper-orange that welcomes without shouting, and it is a
+nod to the toolmakers' palette of cocoa, parchment and copper. The check fades
+from rust into honey, which keeps the mark bright.
 
-**Why the neutrals are sand.** Grey next to a warm accent looks cold and
-dirty. Sand neutrals (hue 80, chroma under 0.025) make surfaces, text and
-accent read as one family: a warm charcoal in the dark theme, cream paper in
-the light one.
+**Why the neutrals are cocoa.** Grey next to a warm accent looks cold and
+dirty. Cocoa neutrals (hue 55, chroma under 0.025) make surfaces, text and
+accent read as one family: a deep cocoa in the dark theme, parchment in the
+light one.
 
-**Why the status hues sit at the same weight.** Coral, apricot, honey, fern
+**Why major is amber.** Rust sits between the blocker red and an orange
+"major", so major moves to amber (72) and minor to a clean honey (95). Every
+severity stays at least 25 degrees from the brand, and always carries its
+label, so a button is never mistaken for a warning.
+
+**Why the status hues sit at the same weight.** Coral, amber, honey, fern
 and lavender share lightness and chroma, so a blocker stands out by meaning
 (its hue and its label), not by being louder than everything else.
 
 **Charts** take a separate, validated categorical order (blue, orange, aqua,
 yellow, magenta) checked for colour-vision-deficiency separation against both
-surfaces; the heatmap is a single-hue sage ramp.
+surfaces; the heatmap is a single-hue rust ramp.
 
 ### Contrast
 
@@ -86,7 +89,7 @@ see [`contrast.md`](contrast.md).
 **Inter** for everything you read, **JetBrains Mono** for code, paths and
 numbers that need to line up. Both are bundled into the app, so it looks the
 same offline. The wordmark is Inter at weight 650 with tight tracking (-0.03 em),
-`self` in the text colour and `check` in sage.
+`self` in the text colour and `check` in rust.
 
 ## Voice
 

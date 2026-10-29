@@ -27,16 +27,16 @@ STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
 L = [0.975, 0.945, 0.885, 0.815, 0.74, 0.66, 0.575, 0.49, 0.405, 0.32, 0.235]
 
 # (hue, peak chroma, role). Hues are spaced so neighbours read as one family:
-# the neutrals are a warm sand, the brand a soft sage held at low chroma so it
-# welcomes rather than shouts, and the status hues sit at the same weight so
-# none shouts louder than its meaning.
+# the neutrals are cocoa and parchment, the brand an oxidised rust that warms
+# without shouting, and the status hues sit at the same weight so none shouts
+# louder than its meaning. Major sits at amber, well clear of the brand.
 FAMILIES: dict[str, tuple[float, float, str]] = {
-    "sage": (130, 0.085, "brand, focus, links, the check"),
+    "rust": (45, 0.14, "brand, focus, links, the check"),
     "fern": (160, 0.13, "pass, additions"),
-    "sand": (80, 0.022, "text, surfaces, borders"),
+    "cocoa": (55, 0.024, "text, surfaces, borders"),
     "coral": (22, 0.17, "blocker, failure, deletions"),
-    "apricot": (55, 0.15, "major, warning"),
-    "honey": (92, 0.14, "minor, caution"),
+    "amber": (72, 0.15, "major, warning"),
+    "honey": (95, 0.14, "minor, caution"),
     "lavender": (295, 0.13, "question, merged"),
 }
 
@@ -168,31 +168,31 @@ def lockup_svg(*, mark: str, text: str, accent: str, bg: str | None) -> str:
 def main() -> None:
     LOGO.mkdir(exist_ok=True)
     pal = scales()
-    sage, honey, fern, sand = pal["sage"], pal["honey"], pal["fern"], pal["sand"]
-    ink, chalk = sand["950"]["hex"], sand["50"]["hex"]
+    rust, honey, fern, cocoa = pal["rust"], pal["honey"], pal["fern"], pal["cocoa"]
+    ink, chalk = cocoa["950"]["hex"], cocoa["50"]["hex"]
 
     variants = {
-        # The default: a sage-to-honey check on the ink tile. Also the app icon.
-        "mark.svg": mark_svg(tile=ink, check_from=sage["300"]["hex"], check_to=honey["200"]["hex"],
-                             horizon=sand["500"]["hex"]),
+        # The default: a rust-to-honey check on the ink tile. Also the app icon.
+        "mark.svg": mark_svg(tile=ink, check_from=rust["400"]["hex"], check_to=honey["300"]["hex"],
+                             horizon=cocoa["500"]["hex"]),
         # For light pages that want a tile.
-        "mark-light.svg": mark_svg(tile=chalk, check_from=sage["600"]["hex"], check_to=honey["400"]["hex"],
-                                   horizon=sand["300"]["hex"]),
+        "mark-light.svg": mark_svg(tile=chalk, check_from=rust["600"]["hex"], check_to=honey["400"]["hex"],
+                                   horizon=cocoa["300"]["hex"]),
         # No tile, for dark and light surfaces.
-        "mark-bare-dark.svg": mark_svg(tile=None, check_from=sage["300"]["hex"], check_to=honey["200"]["hex"],
-                                       horizon=sand["500"]["hex"]),
-        "mark-bare-light.svg": mark_svg(tile=None, check_from=sage["600"]["hex"], check_to=honey["400"]["hex"],
-                                        horizon=sand["300"]["hex"]),
+        "mark-bare-dark.svg": mark_svg(tile=None, check_from=rust["400"]["hex"], check_to=honey["300"]["hex"],
+                                       horizon=cocoa["500"]["hex"]),
+        "mark-bare-light.svg": mark_svg(tile=None, check_from=rust["600"]["hex"], check_to=honey["400"]["hex"],
+                                        horizon=cocoa["300"]["hex"]),
         # 16-32 px: no reflection, which would only be noise at that size.
-        "favicon.svg": mark_svg(tile=ink, check_from=sage["300"]["hex"], check_to=honey["200"]["hex"],
-                                horizon=sand["500"]["hex"], reflection=False, size=32),
+        "favicon.svg": mark_svg(tile=ink, check_from=rust["400"]["hex"], check_to=honey["300"]["hex"],
+                                horizon=cocoa["500"]["hex"], reflection=False, size=32),
     }
     for name, svg in variants.items():
         (LOGO / name).write_text(svg)
     (LOGO / "lockup-dark.svg").write_text(
-        lockup_svg(mark=variants["mark.svg"], text=sand["50"]["hex"], accent=sage["300"]["hex"], bg=ink))
+        lockup_svg(mark=variants["mark.svg"], text=cocoa["50"]["hex"], accent=rust["400"]["hex"], bg=ink))
     (LOGO / "lockup-light.svg").write_text(
-        lockup_svg(mark=variants["mark-light.svg"], text=sand["900"]["hex"], accent=sage["600"]["hex"], bg=chalk))
+        lockup_svg(mark=variants["mark-light.svg"], text=cocoa["900"]["hex"], accent=rust["600"]["hex"], bg=chalk))
 
     # ── tokens ──
     (HERE / "tokens.json").write_text(json.dumps(
@@ -230,17 +230,17 @@ def main() -> None:
 
     # ── contrast table: the pairings the UI actually uses ──
     pairs = [
-        ("Body text on the dark surface", sand["50"]["hex"], sand["900"]["hex"], 7.0),
-        ("Muted text on the dark surface", sand["300"]["hex"], sand["900"]["hex"], 4.5),
-        ("Body text on the light surface", sand["900"]["hex"], sand["50"]["hex"], 7.0),
-        ("Muted text on the light surface", sand["700"]["hex"], sand["50"]["hex"], 4.5),
-        ("Link / accent on dark", sage["300"]["hex"], sand["900"]["hex"], 4.5),
-        ("Link / accent on light", sage["700"]["hex"], sand["50"]["hex"], 4.5),
-        ("Text on the primary button", sand["950"]["hex"], sage["300"]["hex"], 4.5),
-        ("Blocker on dark", coral := pal["coral"]["300"]["hex"], sand["900"]["hex"], 4.5),
-        ("Blocker on light", pal["coral"]["700"]["hex"], sand["50"]["hex"], 4.5),
-        ("Pass on dark", fern["300"]["hex"], sand["900"]["hex"], 4.5),
-        ("Pass on light", fern["700"]["hex"], sand["50"]["hex"], 4.5),
+        ("Body text on the dark surface", cocoa["50"]["hex"], cocoa["900"]["hex"], 7.0),
+        ("Muted text on the dark surface", cocoa["300"]["hex"], cocoa["900"]["hex"], 4.5),
+        ("Body text on the light surface", cocoa["900"]["hex"], cocoa["50"]["hex"], 7.0),
+        ("Muted text on the light surface", cocoa["700"]["hex"], cocoa["50"]["hex"], 4.5),
+        ("Link / accent on dark", rust["300"]["hex"], cocoa["900"]["hex"], 4.5),
+        ("Link / accent on light", rust["700"]["hex"], cocoa["50"]["hex"], 4.5),
+        ("Text on the primary button", cocoa["950"]["hex"], rust["300"]["hex"], 4.5),
+        ("Blocker on dark", coral := pal["coral"]["300"]["hex"], cocoa["900"]["hex"], 4.5),
+        ("Blocker on light", pal["coral"]["700"]["hex"], cocoa["50"]["hex"], 4.5),
+        ("Pass on dark", fern["300"]["hex"], cocoa["900"]["hex"], 4.5),
+        ("Pass on light", fern["700"]["hex"], cocoa["50"]["hex"], 4.5),
     ]
     del coral
     table = ["| Pairing | Foreground | Background | Ratio | Needs | |", "| --- | --- | --- | --- | --- | --- |"]

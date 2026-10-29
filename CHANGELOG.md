@@ -10,12 +10,12 @@ add your change under **Unreleased** in the same pull request.
 
 ### Changed
 
-- **A warmer palette.** The brand moves from teal on cool slate to a soft sage
-  on sand: cream paper in the light theme, warm charcoal in the dark one, and a
-  check that fades from sage into honey. The app, the logo files, the social
-  card, the docs site and the video cards all use it. The severity, diff and
-  chart colours keep their meaning, and every text pairing still clears WCAG
-  AA on every surface.
+- **A warmer palette.** The brand moves from teal on cool slate to rust on
+  cocoa: parchment in the light theme, deep cocoa in the dark one, and a check
+  that fades from rust into honey. The app, the logo files, the social card,
+  the docs site and the videos all use it. Major severity moves to amber so it
+  stays clear of the brand; every text pairing still clears WCAG AA on every
+  surface.
 
 ## [0.3.2] - 2026-10-29
 
