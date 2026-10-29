@@ -29,15 +29,15 @@ shot lockup-dark 420 120 "$(page transparent "$(cat "$OUT/lockup-dark.svg")")"
 shot lockup-light 420 120 "$(page transparent "$(cat "$OUT/lockup-light.svg")")"
 
 MARK="$(sed 's/viewBox="0 0 64 64" width="64" height="64"/viewBox="0 0 64 64" width="148" height="148"/' "$OUT/mark.svg")"
-shot og-card 1200 630 "$(page '#0e1417' "
+shot og-card 1200 630 "$(page '#16130f' "
 <div style=\"width:1200px;height:630px;box-sizing:border-box;padding:84px 96px;display:grid;grid-template-columns:auto 1fr;gap:44px;align-content:center;
-  background:radial-gradient(900px 500px at 85% 15%, rgba(75,219,212,.16), transparent 60%), radial-gradient(700px 420px at 10% 100%, rgba(113,220,166,.10), transparent 60%), #0e1417\">
+  background:radial-gradient(900px 500px at 85% 15%, rgba(177,206,149,.16), transparent 60%), radial-gradient(700px 420px at 10% 100%, rgba(247,215,114,.10), transparent 60%), #16130f\">
   <div style=\"padding-top:6px\">$MARK</div>
   <div style=\"display:grid;gap:22px\">
-    <div style=\"font-size:84px;font-weight:700;letter-spacing:-3px;color:#edf9fe;line-height:1\">self<span style=\"color:#4bdbd4\">check</span></div>
-    <div style=\"font-size:34px;font-weight:500;line-height:1.3;color:#b4c6cc;max-width:820px\">Review pull requests and local branches with the coding agent you already have. Read-only, local, yours.</div>
+    <div style=\"font-size:84px;font-weight:700;letter-spacing:-3px;color:#fcf6ec;line-height:1\">self<span style=\"color:#b1ce95\">check</span></div>
+    <div style=\"font-size:34px;font-weight:500;line-height:1.3;color:#cac1b3;max-width:820px\">Review pull requests and local branches with the coding agent you already have. Read-only, local, yours.</div>
     <div style=\"display:flex;gap:12px;flex-wrap:wrap;margin-top:6px\">
-      $(for t in 'Claude Code' 'Codex' 'Cursor' 'Anthropic API' 'Ollama'; do printf '<span style="font:500 22px JetBrains Mono,monospace;color:#4bdbd4;border:1.5px solid rgba(75,219,212,.4);border-radius:999px;padding:6px 16px">%s</span>' "$t"; done)
+      $(for t in 'Claude Code' 'Codex' 'Cursor' 'Anthropic API' 'Ollama'; do printf '<span style="font:500 22px JetBrains Mono,monospace;color:#b1ce95;border:1.5px solid rgba(177,206,149,.4);border-radius:999px;padding:6px 16px">%s</span>' "$t"; done)
     </div>
   </div>
 </div>")"

@@ -16,7 +16,7 @@ exceeds 24% opacity, so at favicon size a plain check is what remains.
 
 | | |
 | --- | --- |
-| ![mark](assets/brand/mark.svg){ width="96" } | **Mark** — teal-to-sage check on the ink tile. The app icon. [SVG](assets/brand/mark.svg) |
+| ![mark](assets/brand/mark.svg){ width="96" } | **Mark** — sage-to-honey check on the ink tile. The app icon. [SVG](assets/brand/mark.svg) |
 | ![favicon](assets/brand/favicon.svg){ width="48" } | **Favicon** — no reflection, for 16-32 px. [SVG](assets/brand/favicon.svg) |
 | ![lockup light](assets/brand/lockup-light.png){ width="300" } | **Lockups** — [dark](assets/brand/lockup-dark.png), [light](assets/brand/lockup-light.png) |
 | ![card](assets/brand/og-card.png){ width="300" } | **Social card** — 1200 by 630. [PNG](assets/brand/og-card.png) |
@@ -28,12 +28,12 @@ exceeds 24% opacity, so at favicon size a plain check is what remains.
 Seven families, each an eleven-step scale defined in OKLCH, so equal steps
 look equal, and gamut-mapped into sRGB.
 
-- **Teal** (hue 190) is the brand. Developer tools live in blue and purple, and
-  green and red already mean *build passed* and *build broke*; teal sits
-  between trust and go without being mistaken for a status.
-- **Slate** neutrals lean towards the teal's hue, so surfaces, text and accent
-  read as one family instead of grey next to a colour.
-- **Coral, apricot, honey, sage and lavender** carry blocker, major, minor,
+- **Sage** (hue 130) is the brand: a green softened towards olive and held at
+  low chroma, so it is warm and welcoming rather than loud. It sits well apart
+  from fern, the *passed* green, so it is not mistaken for a status.
+- **Sand** neutrals make the surfaces a warm charcoal in the dark theme and
+  cream paper in the light one, so surfaces, text and accent read as one family.
+- **Coral, apricot, honey, fern and lavender** carry blocker, major, minor,
   pass and question at the same weight, so severity is read from meaning, not
   volume.
 - Every text pairing clears **WCAG AA (4.5:1)** on every surface it is used on;
@@ -43,4 +43,4 @@ look equal, and gamut-mapped into sRGB.
 
 **Inter** for reading, **JetBrains Mono** for code and numbers. Both are
 bundled into the app. The wordmark is Inter 650, `self` in the text colour,
-`check` in teal.
+`check` in sage.
