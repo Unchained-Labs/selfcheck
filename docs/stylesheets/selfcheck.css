@@ -2,28 +2,28 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: #723517;
-  --md-primary-fg-color--light: #944822;
-  --md-primary-fg-color--dark: #50250f;
-  --md-accent-fg-color: #944822;
-  --md-typeset-a-color: #944822;
-  --md-default-bg-color: #fbf6ef;
+  --md-primary-fg-color: #015835;
+  --md-primary-fg-color--light: #007346;
+  --md-primary-fg-color--dark: #013e24;
+  --md-accent-fg-color: #007346;
+  --md-typeset-a-color: #007346;
+  --md-default-bg-color: #fcfcfc;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-hue: 45;
-  --md-primary-fg-color: #231b16;
-  --md-primary-fg-color--light: #2b221d;
-  --md-primary-fg-color--dark: #16100d;
-  --md-accent-fg-color: #f28c5c;
-  --md-typeset-a-color: #f28c5c;
-  --md-default-bg-color: #1b1410;
-  --md-code-bg-color: #231b16;
+  --md-hue: 0;
+  --md-primary-fg-color: #1c1c1c;
+  --md-primary-fg-color--light: #232323;
+  --md-primary-fg-color--dark: #121212;
+  --md-accent-fg-color: #3ecf8e;
+  --md-typeset-a-color: #3ecf8e;
+  --md-default-bg-color: #171717;
+  --md-code-bg-color: #1c1c1c;
 }
 
 .md-header, .md-tabs { box-shadow: none; }
 [data-md-color-scheme="default"] .md-header,
-[data-md-color-scheme="default"] .md-tabs { background: #2b221d; }
+[data-md-color-scheme="default"] .md-tabs { background: #232323; }
 
 .md-typeset h1, .md-typeset h2 { font-weight: 650; letter-spacing: -0.02em; }
 
@@ -32,8 +32,8 @@
 .sc-hero h1 { margin: 0; font-size: 2.6rem; line-height: 1.1; }
 .sc-hero h1 span { color: var(--md-typeset-a-color); }
 .sc-hero p { font-size: 1.15rem; margin: 0; max-width: 46rem; opacity: .85; }
-.sc-video { width: 100%; border-radius: 12px; border: 1px solid rgba(170, 145, 125, .25); }
+.sc-video { width: 100%; border-radius: 12px; border: 1px solid rgba(128, 128, 128, .25); }
 .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .9rem; margin: 1.2rem 0; }
-.sc-card { border: 1px solid rgba(170, 145, 125, .25); border-radius: 12px; padding: .9rem 1.1rem; }
+.sc-card { border: 1px solid rgba(128, 128, 128, .25); border-radius: 12px; padding: .9rem 1.1rem; }
 .sc-card strong { display: block; margin-bottom: .25rem; }
 .sc-card p { margin: 0; font-size: .78rem; opacity: .85; }
