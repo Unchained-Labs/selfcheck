@@ -8,6 +8,8 @@ add your change under **Unreleased** in the same pull request.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-30
+
 ### Changed
 
 - **A new palette.** The brand moves from teal on cool slate to emerald on
@@ -99,7 +101,8 @@ add your change under **Unreleased** in the same pull request.
   pull request for new commits.
 - A Claude Code skill and an agent-facing API.
 
-[Unreleased]: https://github.com/Unchained-Labs/selfcheck/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/Unchained-Labs/selfcheck/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Unchained-Labs/selfcheck/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/Unchained-Labs/selfcheck/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Unchained-Labs/selfcheck/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Unchained-Labs/selfcheck/compare/v0.2.0...v0.3.0
