@@ -8,6 +8,14 @@ add your change under **Unreleased** in the same pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- **A new palette.** The brand moves from teal on cool slate to emerald on
+  graphite: true-neutral greys in both themes and a single emerald accent. The
+  app, the logo files, the social card, the docs site and the videos all use
+  it. Severity, diff and chart colours keep their meaning, and every text
+  pairing still clears WCAG AA on every surface.
+
 ## [0.3.2] - 2026-10-29
 
 ## [0.3.1] - 2026-10-29

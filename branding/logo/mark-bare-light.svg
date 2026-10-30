@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="selfcheck">
   <defs>
     <linearGradient id="g" x1="14" y1="40" x2="50" y2="12" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#028b86"/><stop offset="1" stop-color="#208e60"/>
+      <stop offset="0" stop-color="#029059"/><stop offset="1" stop-color="#40c786"/>
     </linearGradient>
     <linearGradient id="f" x1="0" y1="42.5" x2="0" y2="64" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fff"/><stop offset="0.6" stop-color="#fff" stop-opacity="0"/>
@@ -11,7 +11,7 @@
   </defs>
   
   <g clip-path="url(#tile)">
-    <path d="M17.5 56.5 L27 47 L46.5 68" fill="none" stroke="url(#g)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round" mask="url(#fade)" opacity="0.24"/><line x1="13" y1="42.5" x2="51" y2="42.5" stroke="#b4c6cc" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>
+    <path d="M17.5 56.5 L27 47 L46.5 68" fill="none" stroke="url(#g)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round" mask="url(#fade)" opacity="0.24"/><line x1="13" y1="42.5" x2="51" y2="42.5" stroke="#c2c2c2" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>
     <path d="M17.5 28.5 L27 38 L46.5 17" fill="none" stroke="url(#g)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>

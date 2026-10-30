@@ -12,7 +12,7 @@ import type { BundledLanguage, BundledTheme, Highlighter, ThemedToken } from 'sh
 export type Line = ThemedToken[]
 
 const THEMES: Record<'light' | 'dark', BundledTheme> = {
-  // Vitesse: low-contrast, teal-and-sage, and quiet next to the app palette.
+  // Vitesse: low-contrast and warm, quiet next to the app palette.
   light: 'vitesse-light',
   dark: 'vitesse-dark',
 }
